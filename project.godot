@@ -1,0 +1,55 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
+[application]
+
+config/name="HordaviaPrototype"
+run/main_scene="res://world/main.tscn"
+config/features=PackedStringArray("4.7")
+config/icon="res://assets/icon.png"
+
+[autoload]
+
+GameState="*res://core/game_state.gd"
+ContentDB="*res://core/content_db.gd"
+SaveManager="*res://core/save_manager.gd"
+JoystickLayer="*res://player/joystick_layer.gd"
+BulletSwarm="*res://core/bullet_swarm.gd"
+XPManager="*res://core/xp_manager.gd"
+EnemyManager="*res://core/enemy_manager.gd"
+SpawnDirector="*res://core/spawn_director.gd"
+FloatingNumbers="*res://core/floating_numbers.gd"
+DeathFx="*res://core/death_fx.gd"
+AudioManager="*res://core/audio_manager.gd"
+HUD="*res://ui/hud.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[physics]
+
+common/physics_ticks_per_second=30
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

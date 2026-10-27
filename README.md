@@ -38,7 +38,7 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 | §3.1 Joystick de un pulgar | ✅ flotante, con deadzone y knob dibujado |
 | §3.2 MultiMesh bullets | ✅ cap 1500, grilla espacial para impactos |
 | §3.3 Spawn Director JSON | ✅ budget/seg por minuto + eventos de círculo |
-| §3.4 Armas data-driven | ✅ 8 armas base + niveles I–VIII + 3 evoluciones |
+| §3.4 Armas data-driven | ✅ 8 armas base + niveles I–VIII + 8 evoluciones |
 | §3.5 XP + tarjetas de level-up | ✅ rareza ponderada + reroll/desterrar/saltar + pasiva suerte |
 | §3.6 Guardado FileAccess | ✅ monedas, meta, personaje, stats/logros y settings (v3) |
 | §3.7 Shader toon | ✅ 3 bandas + rim |
@@ -64,9 +64,10 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 
 ## Notas de balance rápido
 
-- **Sin fin**: la run solo termina al morir. Cada 18 min el mapa repite los 3 biomas
-  (`spawn_director.gd`) y la presión sube: HP ×(1 + 0.16·min + 0.06·min^1.5),
-  daño ×(1 + 0.045·min), spawn ×(1 + 0.22·ciclo + 0.012·min).
+- **Sin fin**: la run solo termina al morir. Cada bioma dura 6 min; los 7 biomas
+  (`data/biomes.json`) completan un ciclo de 42 min, tras el cual vuelven en orden.
+  La presión sube: HP ×(1 + 0.16·min + 0.06·min^1.5), daño ×(1 + 0.045·min),
+  spawn ×(1 + 0.22·ciclo + 0.012·min).
 - Curva XP: `5 + 6*lvl^1.6` (en `game_state.gd`).
 - Subida de dificultad: editar `tiers` en `data/biomes.json`.
 - Élites: cada 90 s suelta 1 prefab del tier con HP×8 y orbe×4 (`spawn_director.gd`).
@@ -106,34 +107,43 @@ En móvil el pulgar derecho maneja DASH/SALTO (botones táctiles); el modo cáma
 - **Cofres**: cada cambio de bioma suelta 2-3 cofres dorados girando en el mapa.
   Al tocarlos: 3 cartas (o +20 monedas si otra UI está abierta).
 
-## Fase 3.4 — jefes por bioma (3/3), sin fin
+## Fase 3.4 — jefes por bioma (7/7), sin fin
 
-Cada bioma tiene su jefe (`data/biomes.json` → `boss_t` / `boss_key`; `enemies.json`
-→ `boss: true`). La IA es data-driven con dos arquetipos:
+Cada bioma define su jefe y el segundo de aparición local en `data/biomes.json`; las
+estadísticas y el patrón se leen de `data/enemies.json`.
 
-| Jefe | Bioma (local) | Ataque | Invoca | Recompensa |
-|---|---|---|---|---|
-| **Guardián de Niebla** | Bosque, 150 s | **carga**: aviso 0.55 s → embestida 16 m/s con daño de contacto | 10 bats | +60 monedas, cura 30 %, cartas de cofre |
-| **Reina de las Profundidades** | Cuevas, 120 s | **slam rápido**: disco 0.7 s → AoE r 6.0 cada 4.5 s | 12 bats | +60 monedas, cura 30 %, cartas de cofre |
-| **Coloso de Dunas** | Dunas, 90 s | **slam**: disco 0.9 s → AoE r 5.5 cada 6 s | 8 goblins | +150 monedas, cura 30 %, cartas de cofre |
+| Jefe | Bioma (aparición local) | Patrón | Invoca |
+|---|---|---|---|
+| **Guardián de Niebla** | Bosque, 150 s | Carga telegrafiada | 10 murciélagos |
+| **Reina de las Profundidades** | Cuevas, 120 s | Slam de área | 12 murciélagos |
+| **Coloso de Dunas** | Dunas, 90 s | Slam de área | 8 goblins |
+| **Madre de Esporas** | Pantano, 150 s | Slam de área | 14 fuegos fatuos |
+| **Titán de Escarcha** | Tundra, 150 s | Carga telegrafiada | 10 brutos |
+| **Devorador de Magma** | Volcán, 150 s | Slam de área | 12 bombarderos |
+| **Heraldo del Eclipse** | Ruinas, 150 s | Carga telegrafiada | 12 acechadores |
 
-Todos: barra de vida con nombre en el HUD, aparecen a 9 m del jugador, ignoran i-frames
-en el golpe telegrafiado. **Ninguno termina la run**: premian y la partida continúa;
-al repetirse el ciclo vuelven con la escala global de HP/daño.
+Todos muestran su barra de vida, aparecen a 9 m del jugador y su ataque ignora los
+iframes de contacto. Al derrotarlos, la run continúa: dan 60 monedas (150 el Coloso),
+curan hasta 30 % de la vida máxima y ofrecen cartas de cofre. Reaparecen en el ciclo
+siguiente con la escala global de vida y daño.
 
 ## Fase 3.1 — biomas data-driven
 
-El mapa muta a los **6 min** y a los **12 min** (`data/biomes.json`):
+Cada bioma ocupa 6 minutos del ciclo de 42 minutos (`data/biomes.json`):
 
-| Bioma | Paleta | Props | Hordas |
+| Bioma (minuto del ciclo) | Hazard | Clima | Jefe |
 |---|---|---|---|
-| **Bosque de Niebla** (0–6) | verde + niebla azul | rocas | goblins/bats suaves |
-| **Cuevas Profundas** (6–12) | violeta oscuro, luz fría | estalagmitas | bats×60, brutos, budget 14–28/s |
-| **Dunas Ardientes** (12+) | arena, luz cálida | cactus | brutos + mini-enjambre de jefes, HP×6.5; tras 18 min vuelve el ciclo |
+| **Bosque de Niebla** (0–6) | Niebla lenta | Niebla baja | Guardián de Niebla |
+| **Cuevas Profundas** (6–12) | Lava | Brasas subterráneas | Reina de las Profundidades |
+| **Dunas Ardientes** (12–18) | Lava | Tormenta de arena | Coloso de Dunas |
+| **Pantano de Esporas** (18–24) | Veneno | Lluvia ácida | Madre de Esporas |
+| **Tundra Quebrada** (24–30) | Hielo | Ventisca | Titán de Escarcha |
+| **Corazón de Ceniza** (30–36) | Lava | Lluvia de ceniza | Devorador de Magma |
+| **Ruinas del Eclipse** (36–42) | Niebla lenta | Tormenta del eclipse | Heraldo del Eclipse |
 
-Cada bioma trae **tiers y eventos ring propios** (el director reinicia su presupuesto
-al entrar). HUD muestra banner con el nombre y muta luz+fondo+suelo+muros.
-Balance del desierto pendiente de playtest (HP×6.5 es endgame duro).
+Cada bioma trae sus tiers, eventos de horda, props y hazards; el HUD anuncia los cambios
+y el mundo actualiza la paleta, la luz y el suelo. La dificultad se escala por tiempo
+y por ciclo.
 
 ## Fase 2.5 — Pasivas restantes
 
@@ -254,9 +264,14 @@ indicado, aparece una carta **legendaria de EVOLUCIÓN** (garantizada en el sort
 | Bastón de niebla L8 + Filo afilado III | **Railgun de niebla** | Bala perforante (hasta 3 enemigos), daño 30 |
 | Nimbo escaldante L8 + Sigilo magnético II | **Supernova** | Anillo r=5.2 incandescente, daño 10 cada 0.35 s |
 | Disco errante L8 + Gatillo ligero III | **Tempestad de discos** | 2 discos por lanzamiento, daño 18, alcance 11 |
+| Mazo sísmico L8 + Onda expansiva II | **Rompecielos** | Onda sísmica de gran radio |
+| Meteoro rúnico L8 + Viento de cola II | **Caída estelar** | 3 meteoros por lanzamiento |
+| Dron de niebla L8 + Gatillo ligero III | **Enjambre de guerra** | 3 drones de combate |
+| Vacío devorador L8 + Siega II | **Sol Negro** | Singularidad de mayor radio y duración |
+| Cadencia de tormenta L8 + Ojo de tormenta II | **Tormenta encadenada** | Rayo de 6 saltos |
 
-Recetas en `data/evolutions.json` (100 % data-driven). El arma base **desaparece**
-y el nodo de arma se reconstruye en caliente (`weapons` → `upgrades_changed`).
+Hay 8 recetas en `data/evolutions.json` (100 % data-driven). Al evolucionar, el arma base
+**desaparece** y el nodo se reconstruye en caliente (`weapons` → `upgrades_changed`).
 
 ## Fase 2.1 — arsenal (8 armas base, todas data-driven)
 
@@ -271,8 +286,8 @@ y el nodo de arma se reconstruye en caliente (`weapons` → `upgrades_changed`).
 | Espiral de esquirlas | `spiral` | Abanico giratorio de 3 proyectiles que cubre 360° |
 | Escarcha rúnica | `frost` | Anillo helado que daña y ralentiza (×0.55 durante 1.2 s) |
 
-Armas **evolucionadas** (solo vía receta 2.2): `railgun` (perforante), `supernova`
-(anillo r=5.2) y `disc_tempest` (2 discos).
+Armas **evolucionadas** (solo vía receta 2.2): `railgun`, `supernova`, `disc_tempest`,
+`earthbreaker`, `starfall`, `war_swarm`, `black_sun` y `thunderstorm`.
 
 ## Audio (100 % procedural, cero assets)
 

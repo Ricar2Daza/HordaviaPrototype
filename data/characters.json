@@ -1,0 +1,20 @@
+{
+	"vagabundo": {
+		"name": "Vagabundo",
+		"desc": "Equilibrado: 100 HP, velocidad media",
+		"hp": 100, "speed": 6.0, "dmg": 1.0, "fire": 1.0, "magnet": 3.0,
+		"color": [0.55, 0.75, 0.5]
+	},
+	"corredor": {
+		"name": "Corredor",
+		"desc": "Frágil y veloz: 75 HP, +20% velocidad",
+		"hp": 75, "speed": 7.2, "dmg": 0.95, "fire": 1.1, "magnet": 3.0,
+		"color": [0.4, 0.7, 1.0]
+	},
+	"coloso": {
+		"name": "Coloso",
+		"desc": "Tanque lento: 140 HP, +15% daño",
+		"hp": 140, "speed": 5.2, "dmg": 1.15, "fire": 0.9, "magnet": 2.5,
+		"color": [0.9, 0.6, 0.3]
+	}
+}

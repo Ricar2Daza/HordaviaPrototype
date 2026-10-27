@@ -1,0 +1,11 @@
+[
+	{ "id": "meta_hp", "name": "Corazón de hierro", "desc": "+8 HP máximo por nivel", "max": 5, "cost": 120, "step": 90 },
+	{ "id": "meta_dmg", "name": "Filo ancestral", "desc": "+5% daño global por nivel", "max": 5, "cost": 150, "step": 110 },
+	{ "id": "meta_speed", "name": "Botas ligeras", "desc": "+0.15 velocidad por nivel", "max": 5, "cost": 100, "step": 80 },
+	{ "id": "meta_magnet", "name": "Brújula de niebla", "desc": "+0.6 imán por nivel", "max": 3, "cost": 90, "step": 60 },
+	{ "id": "meta_coins", "name": "Bolsa de fortuna", "desc": "+10% monedas por nivel", "max": 5, "cost": 130, "step": 100 },
+	{ "id": "meta_armor", "name": "Piel de basalto", "desc": "+3% armadura inicial por nivel", "max": 4, "cost": 180, "step": 130 },
+	{ "id": "meta_regen", "name": "Savia perpetua", "desc": "+0.15 regeneración inicial por nivel", "max": 4, "cost": 170, "step": 120 },
+	{ "id": "meta_reroll", "name": "Dado de niebla", "desc": "+1 reroll por partida", "max": 2, "cost": 240, "step": 180 },
+	{ "id": "meta_luck", "name": "Ojo de la suerte", "desc": "+1 suerte inicial por nivel", "max": 3, "cost": 200, "step": 150 }
+]

@@ -1,0 +1,9 @@
+[
+	{ "id": "first_blood", "name": "Primera sangre", "desc": "Elimina a tu primer enemigo", "stat": "total_kills", "goal": 1 },
+	{ "id": "slayer_500", "name": "Matarife", "desc": "500 bajas acumuladas", "stat": "total_kills", "goal": 500 },
+	{ "id": "slayer_2000", "name": "Exterminador", "desc": "2000 bajas acumuladas", "stat": "total_kills", "goal": 2000 },
+	{ "id": "boss_hunter", "name": "Cazador de jefes", "desc": "Derrota a un jefe", "stat": "boss_kills", "goal": 1 },
+	{ "id": "victor_1", "name": "Conquistador", "desc": "Gana una partida", "stat": "victories", "goal": 1 },
+	{ "id": "survivor_600", "name": "Superviviente", "desc": "Sobrevive 10 minutos en una partida", "stat": "best_time", "goal": 600 },
+	{ "id": "rich_1000", "name": "Ahorrador", "desc": "Acumula 1000 monedas ganadas", "stat": "coins_earned", "goal": 1000 }
+]

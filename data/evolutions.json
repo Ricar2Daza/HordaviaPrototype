@@ -1,0 +1,82 @@
+[
+	{
+		"id": "evo_railgun",
+		"base": "wand",
+		"passive": "dmg_1",
+		"passive_levels": 3,
+		"weapon_level": 8,
+		"result": "railgun",
+		"name": "Railgun de niebla",
+		"desc": "EVOLUCIÓN: Bastón L8 + Filo afilado III → disparo perforante devastador"
+	},
+	{
+		"id": "evo_supernova",
+		"base": "aura",
+		"passive": "magnet_1",
+		"passive_levels": 2,
+		"weapon_level": 8,
+		"result": "supernova",
+		"name": "Supernova",
+		"desc": "EVOLUCIÓN: Nimbo L8 + Sigilo magnético II → anillo gigante incandescente"
+	},
+	{
+		"id": "evo_disc_tempest",
+		"base": "boomerang",
+		"passive": "rate_1",
+		"passive_levels": 3,
+		"weapon_level": 8,
+		"result": "disc_tempest",
+		"name": "Tempestad de discos",
+		"desc": "EVOLUCIÓN: Disco L8 + Gatillo ligero III → doble disco, más daño y alcance"
+	},
+	{
+		"id": "evo_earthbreaker",
+		"base": "hammer",
+		"passive": "area_1",
+		"passive_levels": 2,
+		"weapon_level": 8,
+		"result": "earthbreaker",
+		"name": "Rompecielos",
+		"desc": "EVOLUCIÓN: Mazo L8 + Onda expansiva II → onda sísmica gigante"
+	},
+	{
+		"id": "evo_starfall",
+		"base": "meteor",
+		"passive": "projspeed_1",
+		"passive_levels": 2,
+		"weapon_level": 8,
+		"result": "starfall",
+		"name": "Caída estelar",
+		"desc": "EVOLUCIÓN: Meteoro L8 + Viento de cola II → triple impacto orbital"
+	},
+	{
+		"id": "evo_war_swarm",
+		"base": "drone",
+		"passive": "rate_1",
+		"passive_levels": 3,
+		"weapon_level": 8,
+		"result": "war_swarm",
+		"name": "Enjambre de guerra",
+		"desc": "EVOLUCIÓN: Dron L8 + Gatillo ligero III → tres drones de combate"
+	},
+	{
+		"id": "evo_black_sun",
+		"base": "void",
+		"passive": "execute_1",
+		"passive_levels": 2,
+		"weapon_level": 8,
+		"result": "black_sun",
+		"name": "Sol Negro",
+		"desc": "EVOLUCIÓN: Vacío L8 + Siega II → gravedad que comprime la horda"
+	},
+	{
+		"id": "evo_thunderstorm",
+		"base": "chain",
+		"passive": "crit_1",
+		"passive_levels": 2,
+		"weapon_level": 8,
+		"result": "thunderstorm",
+		"name": "Tormenta encadenada",
+		"desc": "EVOLUCIÓN: Cadencia L8 + Ojo de tormenta II → rayo de seis saltos"
+	}
+]

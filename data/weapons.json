@@ -1,0 +1,23 @@
+{
+	"wand": { "pattern": "nearest", "dmg": 12, "interval": 0.6, "speed": 18, "life": 2.2, "display": "Bastón de niebla", "note": "Arma inicial: dispara al enemigo más cercano con predicción de tiro" },
+	"orbit": { "pattern": "orbit", "dmg": 6, "blades": 2, "radius": 2.2, "ticks": 0.15, "display": "Cuchillas meridianas", "note": "Cuchillas que orbitan el cuerpo" },
+	"aura": { "pattern": "aura", "dmg": 5, "ticks": 0.5, "radius": 3.2, "display": "Nimbo escaldante", "note": "Anillo de daño continuo alrededor del jugador" },
+	"boomerang": { "pattern": "boomerang", "dmg": 11, "interval": 2.4, "speed": 12, "range": 8.0, "display": "Disco errante", "note": "Disco que sale y regresa, golpeando de ida y de vuelta" },
+	"mine": { "pattern": "mine", "dmg": 18, "interval": 3.0, "radius": 1.8, "capacity": 3, "display": "Sembrador de minas", "note": "Minas estáticas que explotan por proximidad" },
+	"chain": { "pattern": "chain", "dmg": 9, "interval": 2.0, "jumps": 3, "jump_radius": 6.5, "display": "Cadencia de tormenta", "note": "Rayo que salta de enemigo en enemigo" },
+	"spiral": { "pattern": "spiral", "dmg": 7, "interval": 0.34, "speed": 14, "life": 1.9, "shots": 3, "spin": 0.55, "display": "Espiral de esquirlas", "note": "Dispara en espiral giratoria; cubre todas las direcciones" },
+	"frost": { "pattern": "aura", "dmg": 3.5, "ticks": 0.6, "radius": 3.0, "slow": 0.55, "slow_t": 1.2, "color": [0.55, 0.85, 1.0], "display": "Escarcha rúnica", "note": "Anillo helado: daña y ralentiza a los enemigos" },
+	"hammer": { "pattern": "slam", "dmg": 24, "interval": 2.7, "radius": 3.8, "display": "Mazo sísmico", "note": "Golpea el suelo y abre una onda expansiva" },
+	"meteor": { "pattern": "meteor", "dmg": 30, "interval": 3.3, "radius": 3.2, "count": 1, "delay": 0.72, "display": "Meteoro rúnico", "note": "Invoca una roca ardiente sobre el enemigo más cercano" },
+	"drone": { "pattern": "drone", "dmg": 8, "interval": 0.72, "speed": 17, "life": 1.8, "drones": 1, "display": "Dron de niebla", "note": "Compañero orbitante que dispara solo" },
+	"void": { "pattern": "void", "dmg": 10, "interval": 6.0, "radius": 4.2, "duration": 2.5, "ticks": 0.45, "display": "Vacío devorador", "note": "Singularidad que atrae y desgarra a la horda" },
+
+	"railgun": { "pattern": "nearest", "dmg": 30, "interval": 0.5, "speed": 30, "life": 2.6, "pierce": 3, "display": "Railgun de niebla", "note": "Evolución: bala perforante de alto daño" },
+	"supernova": { "pattern": "aura", "dmg": 10, "ticks": 0.35, "radius": 5.2, "color": [1.0, 0.55, 0.2], "display": "Supernova", "note": "Evolución: anillo gigante incandescente" },
+	"disc_tempest": { "pattern": "boomerang", "dmg": 18, "interval": 1.8, "speed": 14, "range": 11.0, "discs": 2, "display": "Tempestad de discos", "note": "Evolución: doble disco giratorio" },
+	"earthbreaker": { "pattern": "slam", "dmg": 44, "interval": 2.1, "radius": 6.0, "display": "Rompecielos", "note": "Evolución: onda sísmica gigante que arrasa el área" },
+	"starfall": { "pattern": "meteor", "dmg": 38, "interval": 2.8, "radius": 4.2, "count": 3, "delay": 0.8, "display": "Caída estelar", "note": "Evolución: tres meteoros sobre la horda" },
+	"war_swarm": { "pattern": "drone", "dmg": 11, "interval": 0.46, "speed": 20, "life": 2.0, "drones": 3, "display": "Enjambre de guerra", "note": "Evolución: tres drones disparando sin descanso" },
+	"black_sun": { "pattern": "void", "dmg": 16, "interval": 5.0, "radius": 5.8, "duration": 3.1, "ticks": 0.35, "display": "Sol Negro", "note": "Evolución: gravedad masiva que comprime la horda" },
+	"thunderstorm": { "pattern": "chain", "dmg": 18, "interval": 1.2, "jumps": 6, "jump_radius": 8.0, "display": "Tormenta encadenada", "note": "Evolución: rayo que salta por toda la pantalla" }
+}

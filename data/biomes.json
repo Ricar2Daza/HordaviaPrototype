@@ -1,0 +1,173 @@
+{
+	"biomes": [
+		{
+			"id": "bosque",
+			"name": "Bosque de Niebla",
+			"t_start": 0,
+			"ground": [0.24, 0.33, 0.30],
+			"bg": [0.09, 0.08, 0.14],
+			"ambient": [0.55, 0.55, 0.75],
+			"light": [1.0, 0.95, 0.85],
+			"light_energy": 1.1,
+			"props": { "kind": "rock", "count": 62, "color": [0.45, 0.42, 0.5] },
+			"hazard": "slow", "hazard_count": 6,
+			"weather": { "type": "fog", "label": "Niebla baja", "intensity": 0.7, "fog": 0.022, "speed": 0.97, "color": [0.62, 0.72, 0.66] },
+			"boss_t": 150.0, "boss_key": "boss_forest",
+			"tiers": [
+				{ "t": 0, "budget": 2.0, "pools": { "goblin": 70, "bat": 30 }, "hp_mult": 1.0 },
+				{ "t": 2, "budget": 6, "pools": { "goblin": 45, "bat": 40, "wisp": 15 }, "hp_mult": 1.5 },
+				{ "t": 4, "budget": 12, "pools": { "goblin": 40, "bat": 30, "brute": 15, "bomber": 10, "wisp": 5 }, "hp_mult": 2.2 },
+				{ "t": 6, "budget": 16, "pools": { "goblin": 20, "wisp": 25, "bomber": 25, "brute": 15, "shaman": 10, "bat": 5 }, "hp_mult": 3.0 }
+			],
+			"events": [
+				{ "t": 1.5, "enemy": "bat", "count": 22, "radius": 24.0 },
+				{ "t": 5.0, "enemy": "goblin", "count": 34, "radius": 28.0 }
+			]
+		},
+		{
+			"id": "cuevas",
+			"name": "Cuevas Profundas",
+			"t_start": 6,
+			"ground": [0.18, 0.16, 0.24],
+			"bg": [0.04, 0.03, 0.07],
+			"ambient": [0.35, 0.35, 0.55],
+			"light": [0.7, 0.75, 1.0],
+			"light_energy": 0.9,
+			"props": { "kind": "stalg", "count": 70, "color": [0.35, 0.28, 0.45] },
+			"hazard": "lava", "hazard_count": 7,
+			"weather": { "type": "embers", "label": "Brasas subterráneas", "intensity": 0.55, "fog": 0.018, "speed": 1.0, "color": [1.0, 0.42, 0.16] },
+			"boss_t": 120.0, "boss_key": "boss_caves",
+			"tiers": [
+				{ "t": 0, "budget": 14, "pools": { "bat": 55, "goblin": 25, "brute": 20 }, "hp_mult": 1.4 },
+				{ "t": 2, "budget": 20, "pools": { "bat": 45, "brute": 25, "goblin": 15, "wisp": 15 }, "hp_mult": 2.1 },
+				{ "t": 4, "budget": 28, "pools": { "bat": 35, "brute": 35, "bomber": 15, "wisp": 15 }, "hp_mult": 3.0 },
+				{ "t": 6, "budget": 34, "pools": { "bat": 25, "brute": 25, "wisp": 20, "bomber": 20, "shaman": 10 }, "hp_mult": 4.2 }
+			],
+			"events": [
+				{ "t": 1.0, "enemy": "bat", "count": 40, "radius": 26.0 },
+				{ "t": 4.0, "enemy": "brute", "count": 14, "radius": 30.0 }
+			]
+		},
+		{
+			"id": "desierto",
+			"name": "Dunas Ardientes",
+			"t_start": 12,
+			"boss_t": 90.0,
+			"boss_key": "boss_final",
+			"ground": [0.72, 0.58, 0.36],
+			"bg": [0.28, 0.14, 0.10],
+			"ambient": [0.85, 0.60, 0.45],
+			"light": [1.0, 0.75, 0.5],
+			"light_energy": 1.25,
+			"props": { "kind": "cactus", "count": 58, "color": [0.3, 0.5, 0.3] },
+			"hazard": "lava", "hazard_count": 6,
+			"weather": { "type": "sand", "label": "Tormenta de arena", "intensity": 0.85, "fog": 0.030, "speed": 0.94, "color": [0.86, 0.66, 0.38] },
+			"tiers": [
+				{ "t": 0, "budget": 22, "pools": { "brute": 55, "goblin": 30, "stalker": 15 }, "hp_mult": 1.8 },
+				{ "t": 2, "budget": 30, "pools": { "brute": 50, "boss_swarm": 20, "wisp": 15, "stalker": 15 }, "hp_mult": 2.7 },
+				{ "t": 4, "budget": 40, "pools": { "brute": 40, "boss_swarm": 25, "bomber": 15, "wisp": 10, "stalker": 10 }, "hp_mult": 3.8 },
+				{ "t": 6, "budget": 48, "pools": { "brute": 30, "wisp": 20, "bomber": 25, "shaman": 10, "boss_swarm": 10, "stalker": 5 }, "hp_mult": 5.2 }
+			],
+			"events": [
+				{ "t": 0.5, "enemy": "boss_swarm", "count": 2, "radius": 28.0 },
+				{ "t": 3.5, "enemy": "goblin", "count": 44, "radius": 28.0 }
+			]
+		},
+		{
+			"id": "pantano",
+			"name": "Pantano de Esporas",
+			"t_start": 18,
+			"ground": [0.20, 0.28, 0.16],
+			"bg": [0.05, 0.10, 0.08],
+			"ambient": [0.42, 0.58, 0.46],
+			"light": [0.72, 0.92, 0.62],
+			"light_energy": 0.95,
+			"props": { "kind": "mushroom", "count": 66, "color": [0.35, 0.58, 0.40] },
+			"hazard": "poison", "hazard_count": 8,
+			"weather": { "type": "rain", "label": "Lluvia ácida", "intensity": 0.8, "fog": 0.028, "speed": 0.93, "color": [0.48, 0.72, 0.52] },
+			"boss_t": 150.0, "boss_key": "boss_swamp",
+			"tiers": [
+				{ "t": 0, "budget": 24, "pools": { "goblin": 35, "wisp": 25, "stalker": 25, "shaman": 15 }, "hp_mult": 2.2 },
+				{ "t": 2, "budget": 32, "pools": { "wisp": 30, "stalker": 25, "brute": 20, "shaman": 15, "bat": 10 }, "hp_mult": 3.2 },
+				{ "t": 4, "budget": 42, "pools": { "wisp": 25, "stalker": 20, "brute": 25, "bomber": 15, "shaman": 15 }, "hp_mult": 4.5 },
+				{ "t": 6, "budget": 52, "pools": { "wisp": 20, "stalker": 20, "brute": 20, "bomber": 20, "shaman": 15, "golem": 5 }, "hp_mult": 6.0 }
+			],
+			"events": [
+				{ "t": 1.0, "enemy": "wisp", "count": 30, "radius": 28.0 },
+				{ "t": 4.5, "enemy": "shaman", "count": 10, "radius": 30.0 }
+			]
+		},
+		{
+			"id": "tundra",
+			"name": "Tundra Quebrada",
+			"t_start": 24,
+			"ground": [0.66, 0.74, 0.82],
+			"bg": [0.12, 0.18, 0.28],
+			"ambient": [0.62, 0.72, 0.92],
+			"light": [0.78, 0.88, 1.0],
+			"light_energy": 1.0,
+			"props": { "kind": "ice", "count": 60, "color": [0.52, 0.78, 0.92] },
+			"hazard": "ice", "hazard_count": 8,
+			"weather": { "type": "snow", "label": "Ventisca", "intensity": 0.9, "fog": 0.024, "speed": 0.91, "color": [0.88, 0.94, 1.0] },
+			"boss_t": 150.0, "boss_key": "boss_tundra",
+			"tiers": [
+				{ "t": 0, "budget": 26, "pools": { "wisp": 30, "bat": 25, "stalker": 25, "brute": 20 }, "hp_mult": 2.6 },
+				{ "t": 2, "budget": 36, "pools": { "wisp": 25, "brute": 25, "stalker": 20, "bomber": 15, "shaman": 15 }, "hp_mult": 3.8 },
+				{ "t": 4, "budget": 46, "pools": { "brute": 30, "wisp": 20, "bomber": 20, "golem": 15, "shaman": 15 }, "hp_mult": 5.2 },
+				{ "t": 6, "budget": 56, "pools": { "brute": 25, "golem": 20, "wisp": 20, "bomber": 20, "stalker": 10, "shaman": 5 }, "hp_mult": 7.0 }
+			],
+			"events": [
+				{ "t": 1.0, "enemy": "brute", "count": 18, "radius": 30.0 },
+				{ "t": 4.0, "enemy": "wisp", "count": 34, "radius": 28.0 }
+			]
+		},
+		{
+			"id": "volcan",
+			"name": "Corazón de Ceniza",
+			"t_start": 30,
+			"ground": [0.30, 0.18, 0.14],
+			"bg": [0.16, 0.05, 0.04],
+			"ambient": [0.72, 0.36, 0.28],
+			"light": [1.0, 0.55, 0.32],
+			"light_energy": 1.15,
+			"props": { "kind": "crystal", "count": 54, "color": [0.62, 0.24, 0.18] },
+			"hazard": "lava", "hazard_count": 10,
+			"weather": { "type": "ash", "label": "Lluvia de ceniza", "intensity": 0.8, "fog": 0.032, "speed": 0.92, "color": [0.72, 0.40, 0.30] },
+			"boss_t": 150.0, "boss_key": "boss_volcano",
+			"tiers": [
+				{ "t": 0, "budget": 30, "pools": { "brute": 35, "bomber": 25, "stalker": 25, "shaman": 15 }, "hp_mult": 3.0 },
+				{ "t": 2, "budget": 40, "pools": { "brute": 30, "bomber": 25, "golem": 20, "shaman": 15, "wisp": 10 }, "hp_mult": 4.4 },
+				{ "t": 4, "budget": 50, "pools": { "brute": 30, "golem": 25, "bomber": 20, "shaman": 15, "stalker": 10 }, "hp_mult": 6.0 },
+				{ "t": 6, "budget": 62, "pools": { "golem": 25, "brute": 25, "bomber": 20, "shaman": 15, "stalker": 10, "wisp": 5 }, "hp_mult": 8.0 }
+			],
+			"events": [
+				{ "t": 0.5, "enemy": "bomber", "count": 28, "radius": 30.0 },
+				{ "t": 4.0, "enemy": "golem", "count": 14, "radius": 30.0 }
+			]
+		},
+		{
+			"id": "ruinas",
+			"name": "Ruinas del Eclipse",
+			"t_start": 36,
+			"ground": [0.30, 0.28, 0.36],
+			"bg": [0.05, 0.04, 0.10],
+			"ambient": [0.55, 0.48, 0.78],
+			"light": [0.72, 0.62, 1.0],
+			"light_energy": 0.9,
+			"props": { "kind": "ruin", "count": 48, "color": [0.48, 0.44, 0.56] },
+			"hazard": "slow", "hazard_count": 7,
+			"weather": { "type": "storm", "label": "Tormenta del eclipse", "intensity": 1.0, "fog": 0.030, "speed": 0.90, "color": [0.58, 0.64, 0.92] },
+			"boss_t": 150.0, "boss_key": "boss_ruins",
+			"tiers": [
+				{ "t": 0, "budget": 34, "pools": { "stalker": 30, "wisp": 25, "brute": 25, "shaman": 20 }, "hp_mult": 3.4 },
+				{ "t": 2, "budget": 44, "pools": { "stalker": 25, "wisp": 20, "brute": 25, "golem": 15, "shaman": 15 }, "hp_mult": 5.0 },
+				{ "t": 4, "budget": 56, "pools": { "brute": 25, "golem": 25, "stalker": 20, "wisp": 15, "shaman": 15 }, "hp_mult": 6.8 },
+				{ "t": 6, "budget": 68, "pools": { "golem": 30, "brute": 25, "stalker": 20, "shaman": 15, "bomber": 10 }, "hp_mult": 9.0 }
+			],
+			"events": [
+				{ "t": 1.0, "enemy": "stalker", "count": 34, "radius": 30.0 },
+				{ "t": 4.5, "enemy": "golem", "count": 16, "radius": 30.0 }
+			]
+		}
+	]
+}

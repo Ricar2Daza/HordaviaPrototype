@@ -1,0 +1,17 @@
+{
+	"cap": 220,
+	"by_minute": [
+		{ "t": 0, "budget": 2.0, "pools": { "goblin": 70, "bat": 30 }, "hp_mult": 1.0 },
+		{ "t": 2, "budget": 6, "pools": { "goblin": 55, "bat": 45 }, "hp_mult": 1.5 },
+		{ "t": 4, "budget": 12, "pools": { "goblin": 45, "bat": 40, "brute": 15 }, "hp_mult": 2.2 },
+		{ "t": 6, "budget": 20, "pools": { "goblin": 35, "bat": 40, "brute": 25 }, "hp_mult": 3.0 },
+		{ "t": 9, "budget": 30, "pools": { "goblin": 30, "bat": 35, "brute": 35 }, "hp_mult": 4.2 },
+		{ "t": 12, "budget": 42, "pools": { "bat": 35, "brute": 45, "boss_swarm": 20 }, "hp_mult": 5.5 }
+	],
+	"ring_events": [
+		{ "t": 1.5, "enemy": "bat", "count": 22, "radius": 20.0 },
+		{ "t": 5.0, "enemy": "goblin", "count": 34, "radius": 22.0 },
+		{ "t": 8.0, "enemy": "boss_swarm", "count": 2, "radius": 24.0 },
+		{ "t": 11.0, "enemy": "brute", "count": 18, "radius": 21.0 }
+	]
+}
