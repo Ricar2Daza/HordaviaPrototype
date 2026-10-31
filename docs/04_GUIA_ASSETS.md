@@ -5,17 +5,17 @@
 ```
 HordaviaPrototype/
   assets/
-    models/            # .glb / .gltf (Blender, y-up, escala 1 unidad = 1 m)
-      enemies/         #   goblin.glb, bat.glb, brute.glb ...
-      player/          #   heroe.glb (con animaciones incluidas)
-      props/           #   roca.glb, arbol.glb, cofre.glb
-      weapons/         #   baston.glb, cuchilla.glb
-    textures/          # .png (paleta, decals, partículas)
-    audio/
-      sfx/             # .wav corto (disparo, hit, pickup, levelup)
-      music/           # .ogg loopada (menu.ogg, bioma_bosque.ogg)
-    ui/                # iconos de armas (128×128), fuentes .ttf
-    vfx/               # texturas de partícula (círculo suave, chispa)
+	models/            # .glb / .gltf (Blender, y-up, escala 1 unidad = 1 m)
+	  enemies/         #   goblin.glb, bat.glb, brute.glb ...
+	  player/          #   heroe.glb (con animaciones incluidas)
+	  props/           #   roca.glb, arbol.glb, cofre.glb
+	  weapons/         #   baston.glb, cuchilla.glb
+	textures/          # .png (paleta, decals, partículas)
+	audio/
+	  sfx/             # .wav corto (disparo, hit, pickup, levelup)
+	  music/           # .ogg loopada (menu.ogg, bioma_bosque.ogg)
+	ui/                # iconos de armas (128×128), fuentes .ttf
+	vfx/               # texturas de partícula (círculo suave, chispa)
   data/                # JSON data-driven (ya existe)
   fx/                  # shaders propios (toon.gdshader)
 ```
