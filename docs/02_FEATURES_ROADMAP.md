@@ -14,7 +14,7 @@ Esfuerzo: S = horas, M = días, L = semana+.
 | # | Feature | Detalle / Definition of Done | Esf. | Estado |
 |---|---------|------------------------------|------|--------|
 | 1.1 | **Salto + dash con botón táctil** | Botón derecho en pantalla (2.º pulgar). Coyote 0.12 s, dash 3 s cd + i-frames | M | ✅ |
-| 1.2 | **Alturas/mapa procedural** | `world/terrain.gd`: heightfield por run (ruido, escalones 0.5 m, acantilado) + cofres con recompensas | M | ✅ (sin castigo de caída) |
+| 1.2 | **Alturas/mapa procedural** | `world/terrain.gd`: heightfield por run (ruido, celdas 2 m, escalones 0.25 m, relieve bajo) + cofres con recompensas | M | ✅ (sin castigo de caída) |
 | 1.3 | **Números de daño flotantes** | Pool de Labels billboarding, 40 | S | ✅ |
 | 1.4 | **Partículas de muerte** | Cubos voxel one-shot pool 24, color por enemigo | S | ✅ |
 | 1.5 | **Audio SFX + música** | 100 % procedural (`AudioManager`); SFX + loop Am–F–C–G | S | ✅ |
@@ -39,7 +39,7 @@ Esfuerzo: S = horas, M = días, L = semana+.
 | 3.1 | **7 biomas con set dressing** | Paleta, luz, props y tablas de hordas propias; ciclo de 42 min | L | ✅ |
 | 3.2 | **Transición de bioma** | Fundido 0.9 s + banner + anillo de portal en el jugador; sin recarga de escena | M | ✅ |
 | 3.3 | **Hazards ambientales** | Data-driven por bioma: ralentización, lava, veneno y hielo; clima asociado | M | ✅ |
-| 3.4 | **Jefe con IA por bioma** | 7/7: carga o slam, invocaciones; reaparecen al repetirse el ciclo | L | ✅ |
+| 3.4 | **Jefe con IA por bioma** | 7/7: carga, slam o volley, visual único e invocaciones; reaparecen al repetirse el ciclo | L | ✅ |
 | 3.5 | **Supervivencia sin fin** | Sin victoria: biomas en bucle, HP/daño/spawn escalan por minuto y ciclo; solo se termina al morir | S | ✅ |
 
 ### Extras entregados (fuera de numeración original)
@@ -53,6 +53,8 @@ Esfuerzo: S = horas, M = días, L = semana+.
 - **Layout táctil responsive**: joystick y botones escalan con el viewport (5"/6.5"/tablet), respetan el safe area y la hitbox coincide con lo dibujado. `tools/check_layouts.sh` valida 3 tamaños en headless (también en CI).
 - **Hápticos móviles**: vibración en daño, dash, salto, jefe, level-up y game over, con toggle persistente en Ajustes → Móvil. Permiso `VIBRATE` activado en el preset Android.
 - **Build Android reproducible**: `tools/build_android.sh` compila debug/release y avisa si faltan export templates; checklist de prueba física en `docs/05_EXPORT_ANDROID.md`.
+- **Enemigos a distancia**: `archer`, `spitter`, `sandcaster` y `shaman` mantienen rango, telegrafían y disparan proyectiles hostiles con pool propio (`core/hostile_projectiles.gd`).
+- **Suelo legible**: centro casi llano, cordillera fuera del radio jugable y cámara con holgura sobre el terreno para que ninguna elevación falsa oculte al personaje.
 
 ## Fase 4 — Meta, retention y guardado
 | # | Feature | Detalle | Esf. | Estado |

@@ -48,9 +48,10 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 | §3.7 Shader toon | ✅ 3 bandas + rim |
 | Hápticos móviles | ✅ daño/dash/salto/jefe/level-up/game over + toggle persistente |
 | Game over/restart | ✅ (+ menú de pausa ESC/☰ con cámara/reiniciar/menú/salir) |
-| Boss con IA propia | ✅ 3 jefes (carga, slam rápido, slam pesado) que reaparecen cada ciclo |
-| Mapa procedural | ✅ heightfield por run + cofres + relieve seguido por entidades |
-| Hazards ambientales | ✅ lava (DoT) y niebla (slow) por bioma |
+| Boss con IA propia | ✅ 7 jefes únicos (carga, slam y volley) con visual propio; reaparecen cada ciclo |
+| Mapa procedural | ✅ heightfield por run + cofres + relieve bajo y legible, sin tapar al jugador |
+| Hazards ambientales | ✅ lava (DoT) y niebla (slow) por bioma, con color propio |
+| Enemigos a distancia | ✅ arqueros, escupidores, lanzadores y chamanes con proyectiles hostiles |
 | Pickups de mapa | ✅ cura / imán / bomba + cofre por élite |
 | Supervivencia sin fin | ✅ biomas en bucle + HP/daño/spawn escalando por minuto y ciclo |
 | Presupuestos por dispositivo | ✅ RAM/GPU → balas, enemigos y partículas (Fase 5.1) |
@@ -77,7 +78,8 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 - Subida de dificultad: editar `tiers` en `data/biomes.json`.
 - Élites: cada 90 s suelta 1 prefab del tier con HP×8 y orbe×4 (`spawn_director.gd`).
 - Enemigos: `goblin`, `bat`, `brute`, `wisp` (veloz), `bomber` (explota al morir),
-  `shaman` (invoca murciélagos) + jefes. Los tiers altos los mezclan.
+  `shaman` (invoca murciélagos y lanza magia), `archer`, `spitter`, `sandcaster`
+  (mantienen distancia y disparan proyectiles) + jefes. Los tiers altos los mezclan.
 
 ## Controles (Fase 1 integrada)
 
@@ -110,9 +112,12 @@ mando o remapear teclas no requiere tocar la lógica del jugador.
 ## Mapa procedural + cofres (roadmap 1.2)
 
 - `world/terrain.gd` genera un **heightfield por run** (FastNoiseLite semilla
-  aleatoria, cuantizado en escalones de 0.5 m, acantilado en el borde) y lo pinta
-  con **1 sola draw call** (MultiMesh de columnas). Player, enemigos y orbes
-  siguen el relieve con `height_at(x, z)`.
+  aleatoria, celdas de 2 m y escalones de 0.25 m). El centro es casi llano y el
+  relieve bajo aparece en el anillo exterior; la cordillera queda fuera del
+  radio jugable (30 m). Se pinta con **1 sola draw call** (MultiMesh de columnas)
+  y Player, enemigos y orbes siguen `height_at(x, z)`.
+- La cámara eleva su altura si el terreno de detrás del jugador es más alto, para
+  no quedar dentro de la montaña ni ocultar al personaje cerca del borde.
 - **Cofres**: cada cambio de bioma suelta 2-3 cofres dorados girando en el mapa.
   Al tocarlos: 3 cartas (o +20 monedas si otra UI está abierta).
 
@@ -126,13 +131,15 @@ estadísticas y el patrón se leen de `data/enemies.json`.
 | **Guardián de Niebla** | Bosque, 150 s | Carga telegrafiada | 10 murciélagos |
 | **Reina de las Profundidades** | Cuevas, 120 s | Slam de área | 12 murciélagos |
 | **Coloso de Dunas** | Dunas, 90 s | Slam de área | 8 goblins |
-| **Madre de Esporas** | Pantano, 150 s | Slam de área | 14 fuegos fatuos |
+| **Madre de Esporas** | Pantano, 150 s | Anillo de esporas (volley) | 14 fuegos fatuos |
 | **Titán de Escarcha** | Tundra, 150 s | Carga telegrafiada | 10 brutos |
 | **Devorador de Magma** | Volcán, 150 s | Slam de área | 12 bombarderos |
-| **Heraldo del Eclipse** | Ruinas, 150 s | Carga telegrafiada | 12 acechadores |
+| **Heraldo del Eclipse** | Ruinas, 150 s | Abanico de proyectiles (volley) | 12 acechadores |
 
-Todos muestran su barra de vida, aparecen a 9 m del jugador y su ataque ignora los
-iframes de contacto. Al derrotarlos, la run continúa: dan 60 monedas (150 el Coloso),
+Cada jefe tiene además una silueta propia (astas, cristales, obeliscos, sombrero de
+esporas, escarcha, cuernos de magma o anillos del eclipse). Todos muestran su barra
+de vida, aparecen a 9 m del jugador y su ataque ignora los iframes de contacto. Al
+derrotarlos, la run continúa: dan 60 monedas (150 el Coloso),
 curan hasta 30 % de la vida máxima y ofrecen cartas de cofre. Reaparecen en el ciclo
 siguiente con la escala global de vida y daño.
 
@@ -143,7 +150,7 @@ Cada bioma ocupa 6 minutos del ciclo de 42 minutos (`data/biomes.json`):
 | Bioma (minuto del ciclo) | Hazard | Clima | Jefe |
 |---|---|---|---|
 | **Bosque de Niebla** (0–6) | Niebla lenta | Niebla baja | Guardián de Niebla |
-| **Cuevas Profundas** (6–12) | Lava | Brasas subterráneas | Reina de las Profundidades |
+| **Cuevas Profundas** (6–12) | Energía abisal (DoT) | Bruma de cristal | Reina de las Profundidades |
 | **Dunas Ardientes** (12–18) | Lava | Tormenta de arena | Coloso de Dunas |
 | **Pantano de Esporas** (18–24) | Veneno | Lluvia ácida | Madre de Esporas |
 | **Tundra Quebrada** (24–30) | Hielo | Ventisca | Titán de Escarcha |
@@ -243,9 +250,11 @@ falta `ResourceLoader` threaded.
 ## Fase 3.3 — Hazards ambientales
 
 `world/hazards.gd` genera 4–6 zonas por bioma según `data/biomes.json`
-(`"hazard": "slow"|"lava"`, `"hazard_count"`): **niebla densa** (×0.55 velocidad) en el
-Bosque y **charcos de lava** (9 HP/s, ignora el grace de contacto) en Cuevas y Dunas.
-Se regeneran en cada cambio de bioma; el daño aplica armadura.
+(`"hazard": "slow"|"lava"`, `"hazard_count"`, `"hazard_color"`): **niebla densa**
+(×0.55 velocidad) en el Bosque y **charcos de lava** (9 HP/s, ignora el grace de
+contacto) en Dunas. Cuevas usa el mismo daño con **pozas de energía abisal** cian
+para una paleta más clara y descansada. Se regeneran en cada cambio de bioma; el
+daño aplica armadura.
 
 ## Fase 2.3 — consumibles de cartas (reroll / desterrar / saltar)
 
@@ -343,19 +352,22 @@ El jugador bot kitea 75 s, aplica mejoras automáticamente y sale con un resumen
 Checkpoints: personaje/meta/maldición al arrancar
 (`SMOKE_META char=… curse=…`), biomas a los 25 s/50 s, evolución
 forzada a los 30 s (`SMOKE_EVOLVE result=railgun ok=true`), armas y stats nuevas
-a los 40 s (`SMOKE_POWERS spiral=true frost=true`, enemigos `bomber`/`shaman`/`wisp`),
-destierro a los 15 s (`SMOKE_BANISH ok=true`), pasivas nuevas a los 10 s, pickups a los 20 s
+a los 40 s (`SMOKE_POWERS spiral=true frost=true`, enemigos `bomber`/`shaman`/`wisp`
+y a distancia `archer`/`spitter`/`sandcaster`), proyectiles hostiles a los 45 s
+(`SMOKE_RANGED fired=… active=…`), destierro a los 15 s (`SMOKE_BANISH ok=true`),
+pasivas nuevas a los 10 s, pickups a los 20 s
 (`SMOKE_PICKUP kind=heal|magnet|bomb`), hazards por bioma (`SMOKE_HAZARDS zones=…`)
-y **los 3 jefes a los 12 s locales de cada bioma**
+y **los jefes del tramo smoke a los 12 s locales de cada bioma**
 (`SMOKE_BOSS spawn` → `SMOKE_BOSS killed kind=… final=…`). A los 70 s prueba
 `SMOKE_DISPLAY fps=30 quality=bajo …` (opciones en caliente) y al cerrar simula
 pérdida de foco (`SMOKE_LIFECYCLE paused=true menu=true`). Como es sin fin, la corrida
 termina a los 75 s, no al matar al Coloso.
 
-Validado en Godot 4.7.2 (26/10/2026): 0 errores de script; smoke de 75 s con 920 bajas,
-nivel 12 y 3 jefes muertos, y la partida siguió (sin victoria). Guardado atómico
-verificado con `HORDAVIA_SAVE_TEST=1` (`write=true bak=true clean=true`).
-El APK Android debug se compiló y firmó con el mismo código.
+Validado en Godot 4.7 (30/10/2026): 0 errores de script; smoke de 75 s con ~900 bajas,
+nivel 12–13 y 3 jefes del tramo muertos, y la partida siguió (sin victoria). Guardado
+atómico verificado con `HORDAVIA_SAVE_TEST=1` (`write=true bak=true clean=true`).
+El APK incluido en `build/` corresponde a la validación móvil anterior; recompílalo con
+`tools/build_android.sh` para incorporar estos cambios de gameplay.
 
 > **No cierres el pipe de stdout** (`| Select-Object -First N`): Godot bloquea el print y
 > el run se congela. Redirige a archivo y filtra después.

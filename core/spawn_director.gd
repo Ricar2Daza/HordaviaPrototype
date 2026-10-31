@@ -131,7 +131,7 @@ func _spawn_one(tier: Dictionary) -> void:
 			break
 	var center: Vector3 = EnemyManager.player.position if EnemyManager.player != null else Vector3.ZERO
 	var a := randf() * TAU
-	var r := randf_range(25.0, 33.0)
+	var r := randf_range(18.0, 28.0)
 	EnemyManager.spawn(kind, center + Vector3(cos(a), 0.0, sin(a)) * r, float(tier.get("hp_mult", 1.0)))
 
 

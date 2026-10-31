@@ -16,7 +16,7 @@ signal kill_event(pos: Vector3, elite: bool)
 # --- Referencias globales de escena (registradas por world/Main) ---
 var terrain = null                # mundo procedural con height_at(x, z) (world/terrain.gd)
 var cam_ref: Camera3D = null
-var arena_radius := 35.5          # radio jugable del mapa ampliado
+var arena_radius := 30.0          # radio jugable (dentro de la cordillera)
 var biome_name := ""              # bioma activo para HUD/hub
 var biome_index := 0
 var weather_name := "Despejado"   # clima activo para HUD
@@ -168,6 +168,7 @@ var _smoke_evo_done := false     # smoke: prueba única de evolución (2.2)
 var _smoke_banish_done := false  # smoke: prueba única de destierro (2.3)
 var _smoke_passive_done := false # smoke: prueba única de pasivas nuevas (2.5)
 var _smoke_powers_done := false  # smoke: armas spiral/frost + crítico/lifesteal
+var _smoke_ranged_done := false  # smoke: enemigos a distancia y proyectiles hostiles
 var _smoke_definitive_done := false # smoke: armas mazo/meteoro/dron/vacío y clima
 var _smoke_display_done := false # smoke: opciones FPS/calidad (5.4)
 
@@ -258,8 +259,17 @@ func _process(delta: float) -> void:
 			EnemyManager.spawn("bomber", pp + Vector3(2.0, 0.0, 0.0), 1.0)
 			EnemyManager.spawn("shaman", pp + Vector3(-2.0, 0.0, 0.0), 1.0)
 			EnemyManager.spawn("wisp", pp + Vector3(0.0, 0.0, 2.0), 1.0)
+			EnemyManager.spawn("archer", pp + Vector3(8.0, 0.0, 0.0), 1.0)
+			EnemyManager.spawn("spitter", pp + Vector3(-8.0, 0.0, 0.0), 1.0)
+			EnemyManager.spawn("sandcaster", pp + Vector3(0.0, 0.0, 8.0), 1.0)
 		print("SMOKE_POWERS spiral=%s frost=%s crit=%.2f leech=%.2f" % [
 			str(weapons.has("spiral")), str(weapons.has("frost")), crit_chance, lifesteal,
+		])
+	# Smoke: comprueba que los enemigos a distancia han disparado proyectiles.
+	if debug_auto_upgrade and run_active and not get_tree().paused and not _smoke_ranged_done and run_time > 45.0:
+		_smoke_ranged_done = true
+		print("SMOKE_RANGED fired=%d active=%d" % [
+			HostileProjectiles.total_fired, HostileProjectiles.active_count(),
 		])
 	# Smoke: a los 55 s prueba el arsenal definitivo, el clima y el mapa ampliado.
 	if debug_auto_upgrade and run_active and not get_tree().paused and not _smoke_definitive_done and run_time > 55.0:
@@ -464,6 +474,7 @@ func start_run() -> void:
 	_smoke_banish_done = false
 	_smoke_passive_done = false
 	_smoke_powers_done = false
+	_smoke_ranged_done = false
 	_smoke_definitive_done = false
 	_smoke_display_done = false
 	rerolls = 1

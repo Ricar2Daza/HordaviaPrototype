@@ -18,7 +18,7 @@ const PATHS := {
 }
 
 const RARITIES := ["comun", "raro", "epico", "legendario"]
-const BOSS_ATTACKS := ["slam", "charge"]
+const BOSS_ATTACKS := ["slam", "charge", "volley"]
 const ACHIEVEMENT_STATS := [
 	"total_kills", "boss_kills", "victories", "runs_played", "best_time", "coins_earned",
 ]
@@ -85,10 +85,23 @@ func _validate_enemies(enemies: Dictionary) -> void:
 			_error("enemies.%s: hp debe ser > 0" % id)
 		if float(def.get("radius", 0.0)) <= 0.0:
 			_error("enemies.%s: radius debe ser > 0" % id)
+		if bool(def.get("ranged", false)):
+			for key in ["attack_range", "attack_interval", "projectile_speed", "projectile_dmg"]:
+				if float(def.get(key, 0.0)) <= 0.0:
+					_error("enemies.%s: %s debe ser > 0 para enemigo a distancia" % [id, key])
+			if float(def.get("keep_range", 0.0)) < 0.0:
+				_error("enemies.%s: keep_range no puede ser negativo" % id)
+			var pc: Variant = def.get("projectile_color", [])
+			if not pc is Array or (pc as Array).size() < 3:
+				_error("enemies.%s: projectile_color debe tener 3 componentes" % id)
 		if bool(def.get("boss", false)):
 			var atk := String(def.get("boss_attack", ""))
 			if not BOSS_ATTACKS.has(atk):
 				_error("enemies.%s: boss_attack '%s' inválido" % [id, atk])
+			if atk == "volley":
+				for key in ["volley_count", "volley_speed", "volley_dmg"]:
+					if float(def.get(key, 0.0)) <= 0.0:
+						_error("enemies.%s: %s debe ser > 0 para jefe volley" % [id, key])
 
 
 func _validate_upgrades(upgrades: Array, weapons: Dictionary) -> void:
@@ -149,6 +162,7 @@ func _validate_evolutions(evolutions: Array, weapons: Dictionary, upgrades: Arra
 
 func _validate_biomes(biomes: Array, enemies: Dictionary) -> void:
 	var ids: Array = []
+	var boss_seen := {}
 	var last_t := -1.0
 	for item in biomes:
 		if not item is Dictionary:
@@ -163,6 +177,9 @@ func _validate_biomes(biomes: Array, enemies: Dictionary) -> void:
 			_error("biomes.%s: boss_key '%s' no existe" % [id, boss])
 		elif not bool(enemies[boss].get("boss", false)):
 			_error("biomes.%s: '%s' no está marcado como boss" % [id, boss])
+		if boss_seen.has(boss):
+			_error("biomes.%s: boss_key '%s' repetido; cada bioma necesita un jefe propio" % [id, boss])
+		boss_seen[boss] = true
 		var t := float(b.get("t_start", 0.0))
 		if t < last_t:
 			_error("biomes.%s: t_start no es creciente" % id)

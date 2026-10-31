@@ -19,7 +19,7 @@ func spawn_for_biome(b: Dictionary) -> void:
 	var count := int(b.get("hazard_count", 4))
 	for i in count:
 		var ang := randf() * TAU
-		var dist := randf_range(8.0, 31.0)
+		var dist := randf_range(7.0, 27.0)
 		var pos := Vector3(cos(ang) * dist, 0.0, sin(ang) * dist)
 		pos.y = float(terrain.call("height_at", pos.x, pos.z)) if terrain != null else 0.0
 		var radius := randf_range(2.4, 4.2)
@@ -32,15 +32,20 @@ func spawn_for_biome(b: Dictionary) -> void:
 		var mat := StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		match kind:
-			"lava":
-				mat.albedo_color = Color(1.0, 0.32, 0.08, 0.55)
-			"poison":
-				mat.albedo_color = Color(0.35, 0.85, 0.20, 0.42)
-			"ice":
-				mat.albedo_color = Color(0.55, 0.82, 1.0, 0.42)
-			_:
-				mat.albedo_color = Color(0.55, 0.35, 0.95, 0.40)
+		var custom: Array = b.get("hazard_color", [])
+		if custom.size() >= 3:
+			var ca := float(custom[3]) if custom.size() >= 4 else 0.48
+			mat.albedo_color = Color(float(custom[0]), float(custom[1]), float(custom[2]), ca)
+		else:
+			match kind:
+				"lava":
+					mat.albedo_color = Color(1.0, 0.32, 0.08, 0.55)
+				"poison":
+					mat.albedo_color = Color(0.35, 0.85, 0.20, 0.42)
+				"ice":
+					mat.albedo_color = Color(0.55, 0.82, 1.0, 0.42)
+				_:
+					mat.albedo_color = Color(0.55, 0.35, 0.95, 0.40)
 		cyl.material = mat
 		mi.mesh = cyl
 		mi.position = pos + Vector3(0.0, 0.05, 0.0)

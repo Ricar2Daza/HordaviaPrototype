@@ -2,7 +2,7 @@
 ## Nodo simple (sin física de colisión): daño por contacto se resuelve en EnemyManager.
 extends Node3D
 
-const ARENA := 35.5
+const ARENA := 30.0
 
 # Salto/dash (roadmap 1.1): coyote 0.12 s, dash 0.22 s + i-frames, cooldown 3 s
 const GRAVITY := 24.0
