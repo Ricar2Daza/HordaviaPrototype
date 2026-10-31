@@ -74,7 +74,10 @@ func _ready() -> void:
 	SaveManager.achievements_unlocked.connect(_on_achievements_unlocked)
 	_apply_safe_area()
 	get_viewport().size_changed.connect(_apply_safe_area)
-	if not GameState.debug_auto_upgrade and not GameState.auto_start_next:
+	var qa_tab := OS.get_environment("HORDAVIA_OPEN_TAB")
+	if not qa_tab.is_empty():
+		_open_start(qa_tab)
+	elif not GameState.debug_auto_upgrade and not GameState.auto_start_next:
 		_open_start()
 	# Tras apply_saved_display (diferido de GameState) refrescar textos de opciones.
 	call_deferred("_refresh_start")
@@ -167,8 +170,8 @@ func _build_hud() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# ESC abre/cierra el menú de pausa (no interfiere con cartas ni game over)
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	# Pausa con ESC/Start (no interfiere con cartas ni game over)
+	if event.is_action_pressed("pause"):
 		if _over_root.visible or _levelup_root.visible or _start_root.visible:
 			return
 		if _menu_open:
@@ -246,6 +249,16 @@ func _notification(what: int) -> void:
 			_on_app_focus_lost()
 		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_WM_WINDOW_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED:
 			_on_app_resumed()
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			# Botón atrás de Android: pausa/reanuda en vez de cerrar la app.
+			if ((_start_root != null and _start_root.visible)
+					or (_levelup_root != null and _levelup_root.visible)
+					or (_over_root != null and _over_root.visible)):
+				return
+			if _menu_open:
+				_close_menu()
+			elif GameState.run_active:
+				_open_menu()
 
 
 func _on_app_focus_lost() -> void:
@@ -346,6 +359,38 @@ func _apply_safe_area() -> void:
 	_menu_btn.offset_right = -16 - right
 	_menu_btn.offset_top = 12 + top
 	_menu_btn.offset_bottom = 46 + top
+	_layout_levelup()
+	if _over_title != null:
+		_over_title.add_theme_font_size_override("font_size", int(clampf(vs.x / 1280.0 * 40.0, 26.0, 40.0)))
+	if _over_stats != null:
+		_over_stats.add_theme_font_size_override("font_size", int(clampf(vs.x / 1280.0 * 22.0, 15.0, 22.0)))
+
+
+func _layout_levelup() -> void:
+	## Cartas y título adaptados a 5", 6.5" y tablet (roadmap 5.5).
+	if _levelup_title == null or _levelup_cards == null or _levelup_footer == null:
+		return
+	var vs := get_viewport().get_visible_rect().size
+	var cs := _card_size()
+	var title_w := minf(vs.x - 48.0, 560.0)
+	_levelup_title.position = Vector2(-title_w * 0.5, clampf(vs.y * 0.12, 60.0, 110.0))
+	_levelup_title.size = Vector2(title_w, 54.0)
+	_levelup_title.add_theme_font_size_override("font_size", int(clampf(vs.x / 1280.0 * 30.0, 20.0, 30.0)))
+	_levelup_cards.add_theme_constant_override("separation", int(clampf(vs.x / 1280.0 * 24.0, 10.0, 24.0)))
+	var footer_w := minf(vs.x - 48.0, 460.0)
+	_levelup_footer.position = Vector2(-footer_w * 0.5, cs.y * 0.5 + 18.0)
+	_levelup_footer.size = Vector2(footer_w, 54.0)
+	var btn_w := clampf((footer_w - 18.0) * 0.5, 140.0, 190.0)
+	if _reroll_btn != null:
+		_reroll_btn.custom_minimum_size = Vector2(btn_w, 46)
+	if _skip_btn != null:
+		_skip_btn.custom_minimum_size = Vector2(btn_w, 46)
+
+
+func _card_size() -> Vector2:
+	var vs := get_viewport().get_visible_rect().size
+	var w := clampf((vs.x - 120.0) / 3.0, 200.0, 300.0)
+	return Vector2(w, clampf(w * 0.73, 170.0, 220.0))
 
 
 func _label(parent: Control, size: int, c: Color) -> Label:
@@ -449,6 +494,7 @@ func _build_levelup() -> void:
 	_levelup_title.text = "¡NIVEL COMPLETADO! — elige una mejora"
 	_levelup_title.add_theme_font_size_override("font_size", 30)
 	_levelup_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_levelup_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_levelup_title.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_levelup_title.position = Vector2(-250, 100)
 	_levelup_title.size = Vector2(500, 50)
@@ -511,13 +557,15 @@ func _render_cards(choices: Array) -> void:
 	for c in _levelup_cards.get_children():
 		_levelup_cards.remove_child(c)
 		c.queue_free()
+	var cs := _card_size()
 	for u in choices:
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 6)
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(300, 220)
+		btn.custom_minimum_size = cs
 		btn.text = "%s\n\n%s" % [String(u["name"]), String(u["desc"])]
-		btn.add_theme_font_size_override("font_size", 22)
+		btn.add_theme_font_size_override("font_size", int(clampf(cs.x * 0.073, 16.0, 22.0)))
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var rarity := String(u.get("rarity", "comun"))
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.14, 0.14, 0.2)
@@ -529,12 +577,13 @@ func _render_cards(choices: Array) -> void:
 		col.add_child(btn)
 		var ban := Button.new()
 		ban.text = "Desterrar (%d)" % GameState.banishes
-		ban.add_theme_font_size_override("font_size", 15)
-		ban.custom_minimum_size = Vector2(300, 34)
+		ban.add_theme_font_size_override("font_size", int(clampf(cs.x * 0.05, 13.0, 15.0)))
+		ban.custom_minimum_size = Vector2(cs.x, 34)
 		ban.disabled = not GameState.can_banish() or choices.size() <= 1
 		ban.pressed.connect(_banish.bind(String(u["id"])))
 		col.add_child(ban)
 		_levelup_cards.add_child(col)
+	_layout_levelup()
 	_update_footer()
 
 
@@ -614,6 +663,7 @@ func _build_game_over() -> void:
 	_over_stats = Label.new()
 	_over_stats.add_theme_font_size_override("font_size", 22)
 	_over_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_over_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(_over_stats)
 
 	var restart := Button.new()
@@ -691,6 +741,7 @@ func _on_achievements_unlocked(list: Array) -> void:
 	if _start_root.visible:
 		_refresh_start()
 	AudioManager.play_sfx("levelup", 1.4)
+	GameState.haptic(0.6, 55)
 
 
 func _on_run_ended(result: Dictionary) -> void:

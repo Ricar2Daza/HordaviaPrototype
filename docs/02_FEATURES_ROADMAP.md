@@ -1,8 +1,9 @@
 # Features a implementar — Hordavia (de prototipo a MVP jugable)
 
-**Estado al 26/10:** Fase 1 ✅; Fase 2 2.1–2.7 ✅; Fase 3 3.1–3.5 ✅ (sin fin);
-Fase 4: 4.1–4.5 ✅; Fase 5: 5.1–5.4 ✅; export Android debug ✅ (5.6 parcial).
-**Siguiente: 5.5** (layouts táctiles en 3 tamaños).
+**Estado al 30/10:** Fase 1 ✅; Fase 2 2.1–2.7 ✅; Fase 3 3.1–3.5 ✅ (sin fin);
+Fase 4: 4.1–4.5 ✅; Fase 5: 5.1–5.4 ✅; 5.5 🟡 (layout responsive + check
+automático; falta prueba en hardware); export Android debug ✅ (5.6 parcial).
+**Siguiente: 5.7** (traducciones es/en) y prueba física de 5.5/5.6.
 
 Estado base: el prototipo ya valida el loop (joystick, MultiMesh bullets, spawn
 director JSON, armas `aimed`/`orbit`, XP+cartas, guardado, shader toon, smoke QA).
@@ -47,6 +48,11 @@ Esfuerzo: S = horas, M = días, L = semana+.
 - **Menú de pausa** (ESC): continuar / cámara / reiniciar / salir.
 - Monstruos por progresión: ya cubierto por tablas por bioma (JSON) + élites + jefe.
 - Evoluciones: Railgun de niebla, Supernova y Tempestad de discos (nodos de arma reconstruidos en caliente); smoke verifica la receta con `SMOKE_EVOLVE`.
+- **InputMap central** (`core/input_setup.gd`): teclado, ratón y gamepad comparten acciones (`move_*`, `jump`, `dash`, `toggle_camera`, `pause`, `cam_*`). Mando: stick izq. mover, A saltar, B dash, Y cámara, Start pausa, stick der. orbita en modo Mouse.
+- **CI + validador de contenido**: `.github/workflows/ci.yml` importa, valida `data/*.json` con `tools/validate_content.gd` y corre el smoke. `.godot/` y el binario del engine quedan fuera de git (`.gitignore`).
+- **Layout táctil responsive**: joystick y botones escalan con el viewport (5"/6.5"/tablet), respetan el safe area y la hitbox coincide con lo dibujado. `tools/check_layouts.sh` valida 3 tamaños en headless (también en CI).
+- **Hápticos móviles**: vibración en daño, dash, salto, jefe, level-up y game over, con toggle persistente en Ajustes → Móvil. Permiso `VIBRATE` activado en el preset Android.
+- **Build Android reproducible**: `tools/build_android.sh` compila debug/release y avisa si faltan export templates; checklist de prueba física en `docs/05_EXPORT_ANDROID.md`.
 
 ## Fase 4 — Meta, retention y guardado
 | # | Feature | Detalle | Esf. | Estado |
@@ -65,8 +71,8 @@ Esfuerzo: S = horas, M = días, L = semana+.
 | 5.2 | **Safe area / notch** | HUD y botones táctiles dentro de `DisplayServer.get_display_safe_area()` | S | ✅ |
 | 5.3 | **Ciclo de vida (Android)** | Foco perdido → guarda, pausa y muestra menú; al volver NO reanuda sola. `NOTIFICATION_APPLICATION_PAUSED/RESUMED` + mute de música | S | ✅ |
 | 5.4 | **Thermal / batería** | Opciones persistentes: FPS 30/60/120/∞, calidad Auto/Baja/Media/Alta (sombras, glow, resolución, props, cámara) + `OS_MEMORY_WARNING` | S | ✅ |
-| 5.5 | **Botones táctiles,** todos jugables con 2 pulgares | Verificación real en 3 tamaños de pantalla (5", 6.5", ~7" tablet) | S |
-| 5.6 | **Export** | **APK release firmada ✅** (SDK 36, icono, lanzador, 16 KB, keystore propio); faltan AAB para Play y test en dispositivo real de cada tier | M | ⏳ |
+| 5.5 | **Botones táctiles,** todos jugables con 2 pulgares | Layout escala 5"/6.5"/tablet + safe area; hitboxes corregidas; `tools/check_layouts.sh` en CI. Falta verificación real en 3 tamaños | S | 🟡 |
+| 5.6 | **Export** | **APK release firmada ✅** (SDK 36, icono, lanzador, 16 KB, keystore propio); `tools/build_android.sh` para recompilar; faltan AAB para Play y test en dispositivo real de cada tier | M | ⏳ |
 | 5.7 | **Traducciones** | es/en primero (Grid `CSV` + `tr()`), preparada para fr/pt | S |
 | 5.8 | **IAP/ads (opcional)** | monedas cosméticas o remove-ads; NO pay-to-win. Revisión de políticas al final | M |
 

@@ -23,6 +23,7 @@ var weather_name := "Despejado"   # clima activo para HUD
 var weather_type := "clear"
 var weather_speed_mult := 1.0     # penalización suave de movimiento por clima
 var camera_mode := "fija"         # "fija" | "mouse" (WASD y joystick son cámara-relativos)
+var haptics_enabled := true       # vibración móvil/mando (roadmap 5.5)
 var card_source := "nivel"        # origen de las cartas: "nivel" | "cofre"
 var overlay_open := false         # true si HUD tiene la pausa de cartas abierta
 var rerolls := 1                  # consumibles por run (roadmap 2.3)
@@ -60,11 +61,35 @@ var shadows := false              # sombras direccionales (tier alto)
 var render_scale := 1.0           # resolución 3D interna
 var prop_mult := 1.0              # densidad de props del bioma
 var camera_far := 100.0           # distancia de dibujado
+var _last_haptic_ms := 0          # cooldown interno de vibración
 
 func set_camera_mode(m: String) -> void:
 	camera_mode = m
 	SaveManager.save_settings({"camera_mode": m})
 	setting_changed.emit()
+
+
+func set_haptics(enabled: bool) -> void:
+	haptics_enabled = enabled
+	SaveManager.save_settings({"haptics": enabled})
+
+
+## Vibración corta en móvil o en el primer mando conectado.
+## El cooldown evita ráfagas cuando varios sistemas reaccionan al mismo golpe.
+func haptic(strength := 0.5, duration_ms := 35, force := false) -> void:
+	if not haptics_enabled:
+		return
+	var now := Time.get_ticks_msec()
+	if not force and now - _last_haptic_ms < 30:
+		return
+	_last_haptic_ms = now
+	var s := clampf(strength, 0.0, 1.0)
+	if OS.has_feature("mobile"):
+		Input.vibrate_handheld(duration_ms, s)
+		return
+	var pads := Input.get_connected_joypads()
+	if not pads.is_empty():
+		Input.start_joy_vibration(int(pads[0]), s * 0.6, s, float(duration_ms) / 1000.0)
 
 
 # --- Tienda meta y personajes (roadmap 4.1/4.2) ---
@@ -293,6 +318,7 @@ func apply_saved_display() -> void:
 	camera_mode = String(SaveManager.settings.get("camera_mode", "fija"))
 	if camera_mode != "mouse":
 		camera_mode = "fija"
+	haptics_enabled = bool(SaveManager.settings.get("haptics", true))
 	fps_limit = int(SaveManager.settings.get("fps_limit", 60))
 	if not [0, 30, 60, 120].has(fps_limit):
 		fps_limit = 60
@@ -480,6 +506,7 @@ func add_xp(v: int) -> void:
 	while xp >= xp_to_next(level):
 		xp -= xp_to_next(level)
 		level += 1
+		haptic(0.55, 40)
 		var choices := ContentDB.roll_upgrades(upgrade_counts)
 		if choices.is_empty():
 			continue
@@ -596,12 +623,13 @@ func magnet_boost(v: float, seconds: float) -> void:
 
 
 func take_damage(d: float) -> void:
-	if not run_active:
+	if not run_active or d <= 0.0:
 		return
 	if damage_grace > 0.0:
 		return
 	damage_grace = 0.5
 	hp = maxf(hp - d * (1.0 - armor), 0.0)
+	haptic(0.85, 50)
 	hp_changed.emit(hp, max_hp)
 	if hp <= 0.0:
 		end_run(false)
@@ -647,6 +675,7 @@ func offer_chest_cards() -> void:
 		apply_upgrade(choices[0])
 		return
 	AudioManager.play_sfx("levelup")
+	haptic(0.5, 40)
 	leveled.emit(choices)
 
 
@@ -667,5 +696,6 @@ func end_run(victory: bool) -> void:
 		# Smoke: valida logros en memoria pero no contamina el save real
 		SaveManager.register_run(coins, run_time, kills, victory, bosses_killed, false)
 	AudioManager.play_sfx("gameover" if not victory else "levelup")
+	haptic(1.0, 140, true)
 	get_tree().paused = true
 	run_ended.emit(last_result)

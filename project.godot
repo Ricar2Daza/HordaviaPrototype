@@ -21,6 +21,7 @@ config/icon="res://assets/icon.png"
 
 [autoload]
 
+InputSetup="*res://core/input_setup.gd"
 GameState="*res://core/game_state.gd"
 ContentDB="*res://core/content_db.gd"
 SaveManager="*res://core/save_manager.gd"

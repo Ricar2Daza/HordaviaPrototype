@@ -71,11 +71,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventMouseMotion and GameState.camera_mode == "mouse":
 		cam_yaw -= event.relative.x * MOUSE_SENS
-	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+	elif event.is_action_pressed("toggle_camera"):
 		GameState.set_camera_mode("mouse" if GameState.camera_mode == "fija" else "fija")
 
 
 func _physics_process(_dt: float) -> void:
+	# Stick derecho / Q-E: orbitar solo en modo Mouse (en Fija la cámara no gira).
+	if GameState.camera_mode == "mouse":
+		var cam_x := Input.get_axis("cam_left", "cam_right")
+		if absf(cam_x) > 0.05:
+			cam_yaw -= cam_x * 2.4 * _dt
 	_update_cam(_dt)
 	_update_chests(_dt)
 	_update_rings(_dt)

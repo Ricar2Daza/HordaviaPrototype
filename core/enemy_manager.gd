@@ -173,6 +173,7 @@ func spawn(kind: String, pos: Vector3, hp_mult: float = 1.0, elite: bool = false
 	_active.append(e)
 	if e.boss:
 		boss_ref = e
+		GameState.haptic(0.8, 90)
 
 
 func spawn_ring(kind: String, center: Vector3, count: int, radius: float, hp_mult: float, elite: bool = false) -> void:

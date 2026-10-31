@@ -19,7 +19,8 @@ var _coyote := 0.0
 var _dash_t := 0.0
 var _dash_cd := 0.0
 var _dash_dir := Vector3.ZERO
-var _space_prev := false
+var _jump_prev := false
+var _dash_prev := false
 var _smoke_next_action := 2.5
 var _model: Node3D = null
 var _g := 0.0   # altura del terreno bajo el player (procedural)
@@ -82,6 +83,7 @@ func jump() -> void:
 		_vy = JUMP_V
 		_coyote = 0.0
 		AudioManager.play_sfx("jump")
+		GameState.haptic(0.2, 16)
 
 
 func dash() -> void:
@@ -94,6 +96,7 @@ func dash() -> void:
 	_dash_t = DASH_TIME
 	_dash_cd = DASH_CD
 	AudioManager.play_sfx("dash")
+	GameState.haptic(0.45, 28)
 	# i-frames breves al hacer dash (sinergia con el gracia de contacto):
 	GameState.damage_grace = maxf(GameState.damage_grace, 0.35)
 
@@ -103,16 +106,20 @@ func _physics_process(delta: float) -> void:
 		return
 	_dash_cd = maxf(_dash_cd - delta, 0.0)
 	_g = _terrain_h()
+	# JoystickLayer centraliza teclado, gamepad y táctil en move_vector.
 	var v := JoystickLayer.move_vector
 	if v.length() < 0.05:
 		v = Vector2.ZERO
-		if Input.is_physical_key_pressed(KEY_A): v.x -= 1
-		if Input.is_physical_key_pressed(KEY_D): v.x += 1
-		if Input.is_physical_key_pressed(KEY_W): v.y -= 1
-		if Input.is_physical_key_pressed(KEY_S): v.y += 1
-	if Input.is_physical_key_pressed(KEY_SPACE) and not _space_prev:
+	# Salto/dash por borde de pulsación: funciona con teclado y mando sin que
+	# un botón de UI con foco consuma el evento (Space también es ui_accept).
+	var jump_down := Input.is_action_pressed("jump")
+	if jump_down and not _jump_prev:
 		jump()
-	_space_prev = Input.is_physical_key_pressed(KEY_SPACE)
+	_jump_prev = jump_down
+	var dash_down := Input.is_action_pressed("dash")
+	if dash_down and not _dash_prev:
+		dash()
+	_dash_prev = dash_down
 	var dir := _input_dir(v)
 	if dir.length() > 1.0:
 		dir = dir.normalized()

@@ -27,6 +27,7 @@ const NAV_LABELS := {
 const FPS_OPTIONS := [[30, "30"], [60, "60"], [120, "120"], [0, "∞"]]
 const QUALITY_OPTIONS := [["auto", "Auto"], ["bajo", "Baja"], ["medio", "Media"], ["alto", "Alta"]]
 const CAMERA_OPTIONS := [["fija", "Fija"], ["mouse", "Mouse"]]
+const HAPTIC_OPTIONS := [[true, "Sí"], [false, "No"]]
 
 var _tab := "jugar"
 var _codex_sub := "armas"
@@ -206,7 +207,7 @@ func _build_shell() -> void:
 	_scroll.add_child(_content)
 
 	var footer := Label.new()
-	footer.text = "WASD / joystick · C cambia cámara · ESC o ☰ pausa · Todo el progreso se guarda solo"
+	footer.text = "WASD / joystick / mando · C cambia cámara · ESC o ☰ pausa · Todo el progreso se guarda solo"
 	footer.add_theme_font_size_override("font_size", 10)
 	footer.add_theme_color_override("font_color", Color(1, 1, 1, 0.38))
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -642,9 +643,15 @@ func _render_settings() -> void:
 	_slider_row(audio, "Música", int(SaveManager.settings.get("music_vol", 70)), _set_music_volume)
 	_slider_row(audio, "Efectos", int(SaveManager.settings.get("sfx_vol", 85)), _set_sfx_volume)
 
+	var mobile := _card(_content, 0.0, Color(0.20, 0.28, 0.24))
+	_label(mobile, "MÓVIL", 17, Color(0.74, 1.0, 0.82))
+	_label(mobile, "Vibración", 12, Color(1, 1, 1, 0.66))
+	_segmented(mobile, HAPTIC_OPTIONS, GameState.haptics_enabled, _set_haptics)
+	_label(mobile, "El joystick y los botones escalan con la pantalla y respetan el notch.", 10, Color(0.70, 1.0, 0.80, 0.62))
+
 	var info := _card(_content, 0.0, Color(0.16, 0.22, 0.27))
 	_label(info, "CONTROLES", 15, Color(0.82, 1.0, 0.90))
-	_label(info, "Joystick virtual: mitad izquierda. Saltar/dash: botones táctiles. Teclado: WASD/flechas, Espacio salta, Shift dash, C cámara, ESC pausa.", 11, Color(1, 1, 1, 0.62))
+	_label(info, "Teclado: WASD/flechas, Espacio salta, Shift dash, C cámara, ESC pausa. Mando: stick izq. mover, A saltar, B dash, Y cámara, Start pausa, stick der. orbita (modo Mouse). Táctil: joystick + botones.", 11, Color(1, 1, 1, 0.62))
 	if GameState.run_active:
 		_primary(info, "▶  VOLVER AL JUEGO", func() -> void: resume_requested.emit(), 0.0, 44)
 
@@ -721,6 +728,14 @@ func _set_quality(mode: String) -> void:
 func _set_camera(mode: String) -> void:
 	GameState.set_camera_mode(mode)
 	SaveManager.save_settings({"camera_mode": mode})
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
+func _set_haptics(enabled: bool) -> void:
+	GameState.set_haptics(enabled)
+	if enabled:
+		GameState.haptic(0.4, 30)
 	AudioManager.play_sfx("pickup", 1.15)
 	refresh()
 

@@ -15,8 +15,9 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
    y hay fallback de **WASD** para iterar rápido.
 4. **Android**: instala `build/Hordavia.apk` en un teléfono ARM64.
    Guía completa en [`docs/05_EXPORT_ANDROID.md`](docs/05_EXPORT_ANDROID.md).
+   Para recompilar el APK con el código actual: `bash tools/build_android.sh`.
 
-## Android (APK final)
+## Android (APKs en `build/`)
 
 - `build/Hordavia.apk`: plantilla **release** (25.5 MiB), firmada con keystore propio
   (`CN=Hordavia`), lista para instalar y medir FPS reales.
@@ -29,19 +30,23 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 - El **GSI Android 17** no se usa para compilar: es una imagen de sistema para un teléfono
   ARM64 con bootloader desbloqueado. Instrucciones de flasheo e instalación en la guía.
 - Falta probarlo en hardware real: al compilar no había ningún dispositivo conectado.
+- **Los APK de `build/` son del 26/10** y no incluyen el layout táctil responsive ni
+  los hápticos de este cambio. Recompila con `bash tools/build_android.sh` (debug) o
+  `bash tools/build_android.sh --release` (release con keystore).
 - AAB para Play sigue pendiente (bloque 5.6 del roadmap).
 
 ## Qué contiene (fase 0 + parte de fase 1 de la guía)
 
 | Sistema (guía) | Estado en el prototipo |
 |---|---|
-| §3.1 Joystick de un pulgar | ✅ flotante, con deadzone y knob dibujado |
+| §3.1 Joystick de un pulgar | ✅ flotante, deadzone y knob; escala 5"/6.5"/tablet + safe area |
 | §3.2 MultiMesh bullets | ✅ cap 1500, grilla espacial para impactos |
 | §3.3 Spawn Director JSON | ✅ budget/seg por minuto + eventos de círculo |
 | §3.4 Armas data-driven | ✅ 8 armas base + niveles I–VIII + 8 evoluciones |
 | §3.5 XP + tarjetas de level-up | ✅ rareza ponderada + reroll/desterrar/saltar + pasiva suerte |
 | §3.6 Guardado FileAccess | ✅ monedas, meta, personaje, stats/logros y settings (v3) |
 | §3.7 Shader toon | ✅ 3 bandas + rim |
+| Hápticos móviles | ✅ daño/dash/salto/jefe/level-up/game over + toggle persistente |
 | Game over/restart | ✅ (+ menú de pausa ESC/☰ con cámara/reiniciar/menú/salir) |
 | Boss con IA propia | ✅ 3 jefes (carga, slam rápido, slam pesado) que reaparecen cada ciclo |
 | Mapa procedural | ✅ heightfield por run + cofres + relieve seguido por entidades |
@@ -78,17 +83,21 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 
 | Entrada | Acción |
 |---|---|
-| Arrastrar / WASD | Movimiento (joystick flotante, **relativo a cámara**) |
-| Botón **DASH** (derecha-abajo) / Shift* | Dash 0.22 s + i-frames, cooldown 3 s |
-| Botón **SALTO** (derecha-arriba) / Espacio | Salto (con coyote 0.12 s) |
-| **C** | Alternar cámara: Fija ⇄ Mouse |
-| **ESC** / botón **☰ MENÚ** | Menú de pausa en cualquier pantalla (continuar / cámara / reiniciar / menú / salir) |
+| Arrastrar / WASD / flechas | Movimiento (joystick flotante, **relativo a cámara**) |
+| Stick izquierdo / cruceta (mando) | Movimiento analógico |
+| Botón **DASH** (derecha-abajo) / Shift* / **B** | Dash 0.22 s + i-frames, cooldown 3 s |
+| Botón **SALTO** (derecha-arriba) / Espacio / **A** | Salto (con coyote 0.12 s) |
+| **C** / **Y** | Alternar cámara: Fija ⇄ Mouse |
+| **ESC** / **Start** / botón **☰ MENÚ** | Menú de pausa en cualquier pantalla (continuar / cámara / reiniciar / menú / salir) |
 | Clic izquierdo (modo mouse) | Captura el mouse para orbitar la cámara |
+| Stick derecho / **Q-E** (modo mouse) | Orbitar la cámara |
 | Clic en cartas | Elegir mejora al subir de nivel |
 
-*Dash/salto por teclado se detectan por borde de pulsación (una pulsación = una acción).
+*Dash/salto por teclado y mando se detectan por borde de pulsación (una pulsación = una acción).
 En móvil el pulgar derecho maneja DASH/SALTO (botones táctiles); el modo cámara
 "Mouse" es la variante de escritorio. El modo **Fija** es el equilibrio para móvil.
+Todas las entradas pasan por `core/input_setup.gd` (InputMap), así que añadir un
+mando o remapear teclas no requiere tocar la lógica del jugador.
 
 ## Juice activo tras la Fase 1
 
@@ -295,6 +304,31 @@ Armas **evolucionadas** (solo vía receta 2.2): `railgun`, `supernova`, `disc_te
 y un loop de música (progresión Am–F–C–G con bajo/arpegio/batería) **en código al
 arrancar** — licencias limpias por diseño. Buses SFX y Music ya separados para
 opciones de volumen futuras.
+
+## QA automático (CI + validador de contenido)
+
+`.github/workflows/ci.yml` corre en cada push/PR:
+
+1. Descarga Godot `4.7-stable`.
+2. Importa el proyecto (`--headless --import`).
+3. Valida los JSON con `tools/validate_content.gd` (referencias de armas,
+   evoluciones, biomas, jefes, pools, personajes, maldiciones y logros).
+4. Comprueba el layout táctil en 5", 6.5" y tablet con `tools/check_layouts.sh`
+   (sin display, simulando el viewport).
+5. Ejecuta el smoke de 75 s y exige `SMOKE_RESULT` en el log.
+
+Local:
+
+```
+Godot_v4.7-stable_linux.x86_64 --headless --path . --script res://tools/validate_content.gd
+```
+
+Para abrir una pestaña del hub directamente en QA (por ejemplo, la nueva tarjeta
+Móvil): `HORDAVIA_OPEN_TAB=ajustes ./Godot_v4.7-stable_linux.x86_64 --path .`.
+
+El validador sale con código 1 y lista `CONTENT_ERROR …` si algo quedó mal
+referenciado. `.godot/` y el binario del engine están en `.gitignore`; el CI
+siempre parte de un import limpio.
 
 ## Modo smoke (QA headless)
 
