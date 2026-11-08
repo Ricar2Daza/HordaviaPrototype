@@ -31,6 +31,68 @@ const SHAKE_OPTIONS := [[0.0, "Off"], [0.5, "Suave"], [1.0, "Normal"]]
 const TOGGLE_OPTIONS := [[false, "Off"], [true, "On"]]
 const TOUCH_OPTIONS := [[0.0, "Auto"], [0.9, "S"], [1.0, "M"], [1.15, "L"]]
 
+# Paleta "fuego sobre negro": el menú inicial es negro con llamas procedurales.
+const FIRE_SHADER := """
+shader_type canvas_item;
+render_mode blend_add, unshaded;
+
+uniform vec3 fire_color : source_color = vec3(1.0, 0.30, 0.04);
+uniform vec3 core_color : source_color = vec3(1.0, 0.78, 0.30);
+uniform float speed = 1.0;
+uniform float scale = 3.0;
+uniform float intensity = 1.0;
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += a * vnoise(p);
+		p *= 2.02;
+		a *= 0.5;
+	}
+	return v;
+}
+
+void fragment() {
+	vec2 uv = UV;
+	float t = TIME * speed;
+	float h = uv.y;
+	vec2 p = vec2(uv.x * scale, (1.0 - h) * scale * 1.15 - t * 1.7);
+	float warp = fbm(p * 0.7 + vec2(t * 0.33, 0.0));
+	float n = fbm(p + vec2(warp * 1.5, 0.0));
+	float mask = smoothstep(0.0, 0.82, h + (n - 0.5) * 0.95);
+	float body = smoothstep(0.28, 0.78, n + h * 0.55);
+	float flame = clamp(mask * body * intensity, 0.0, 1.0);
+	vec3 col = mix(fire_color, core_color, pow(flame, 2.2));
+	col += fire_color * 0.22 * mask * mask;
+	COLOR = vec4(col * flame, flame);
+}
+"""
+
+const C_TEXT := Color(0.96, 0.93, 0.88)
+const C_MUTED := Color(0.74, 0.68, 0.60, 0.88)
+const C_AMBER := Color(1.0, 0.62, 0.22)
+const C_AMBER_SOFT := Color(1.0, 0.80, 0.48)
+const C_PANEL := Color(0.022, 0.018, 0.014, 0.80)
+const C_BORDER := Color(0.34, 0.21, 0.11, 0.85)
+
 var _tab := "jugar"
 var _codex_sub := "armas"
 var _margin: MarginContainer
@@ -41,10 +103,16 @@ var _title: Label
 var _subtitle: Label
 var _content: VBoxContainer
 var _scroll: ScrollContainer
+var _embers: CPUParticles2D
+var _fire_far: ColorRect
+var _fire_near: ColorRect
 
 
 func setup() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Un Control creado oculto bajo un CanvasLayer no recibe layout automático:
+	# sin tamaño explícito el hub queda en 0x0 y el botón JUGAR es inalcanzable.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	set_deferred("size", get_viewport().get_visible_rect().size)
 	_build_background()
 	_build_shell()
 	_apply_safe_area()
@@ -70,42 +138,93 @@ func select_tab(tab: String) -> void:
 # ---------------- estructura visual ----------------
 
 func _build_background() -> void:
+	# Fondo negro puro: las llamas son las únicas que aportan luz.
 	var bg := ColorRect.new()
-	bg.color = Color(0.018, 0.025, 0.040, 1.0)
+	bg.color = Color.BLACK
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	var grad := Gradient.new()
-	grad.offsets = PackedFloat32Array([0.0, 0.42, 1.0])
-	grad.colors = PackedColorArray([
-		Color(0.03, 0.10, 0.10, 1.0),
-		Color(0.04, 0.04, 0.09, 1.0),
-		Color(0.10, 0.035, 0.08, 1.0),
-	])
-	var gt := GradientTexture2D.new()
-	gt.gradient = grad
-	gt.fill_from = Vector2(0.0, 0.0)
-	gt.fill_to = Vector2(1.0, 1.0)
-	gt.width = 512
-	gt.height = 512
-	var tex := TextureRect.new()
-	tex.texture = gt
-	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tex.stretch_mode = TextureRect.STRETCH_SCALE
-	tex.set_anchors_preset(Control.PRESET_FULL_RECT)
-	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(tex)
+	var shader := Shader.new()
+	shader.code = FIRE_SHADER
+	_fire_far = _make_fire(shader, 0.36, 0.58, Color(1.0, 0.20, 0.03), Color(1.0, 0.50, 0.10), 2.1, 0.80, 0.85)
+	_fire_near = _make_fire(shader, 0.62, 1.00, Color(1.0, 0.36, 0.05), Color(1.0, 0.90, 0.48), 3.4, 1.35, 1.10)
+	_build_embers()
 
-	var watermark := Label.new()
-	watermark.text = "HORDAVIA"
-	watermark.add_theme_font_size_override("font_size", 150)
-	watermark.add_theme_color_override("font_color", Color(0.65, 1.0, 0.8, 0.035))
-	watermark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	watermark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	watermark.set_anchors_preset(Control.PRESET_FULL_RECT)
-	watermark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(watermark)
+	# Brasas tenues en la parte alta para que el negro no quede muerto.
+	var haze := ColorRect.new()
+	haze.color = Color(0.30, 0.08, 0.02, 0.10)
+	haze.set_anchors_preset(Control.PRESET_FULL_RECT)
+	haze.anchor_top = 0.55
+	haze.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(haze)
+
+
+func _make_fire(shader: Shader, top: float, bottom: float, fc: Color, cc: Color,
+		sc: float, sp: float, it: float) -> ColorRect:
+	var r := ColorRect.new()
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.anchor_top = top
+	r.anchor_bottom = bottom
+	r.offset_left = 0
+	r.offset_right = 0
+	r.offset_top = 0
+	r.offset_bottom = 0
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = shader
+	m.set_shader_parameter("fire_color", Vector3(fc.r, fc.g, fc.b))
+	m.set_shader_parameter("core_color", Vector3(cc.r, cc.g, cc.b))
+	m.set_shader_parameter("scale", sc)
+	m.set_shader_parameter("speed", sp)
+	m.set_shader_parameter("intensity", it)
+	r.material = m
+	add_child(r)
+	return r
+
+
+func _build_embers() -> void:
+	_embers = CPUParticles2D.new()
+	_embers.amount = 64
+	_embers.lifetime = 4.5
+	_embers.preprocess = 2.0
+	_embers.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_embers.emission_rect_extents = Vector2(620, 6)
+	_embers.direction = Vector2(0, -1)
+	_embers.spread = 22.0
+	_embers.initial_velocity_min = 26.0
+	_embers.initial_velocity_max = 96.0
+	_embers.gravity = Vector2(0, -14)
+	_embers.scale_amount_min = 0.05
+	_embers.scale_amount_max = 0.18
+	_embers.color = Color(1.0, 0.62, 0.22, 0.9)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.0, 0.85, 0.45, 1.0))
+	ramp.set_color(1, Color(1.0, 0.16, 0.02, 0.0))
+	_embers.color_ramp = ramp
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	tex.width = 32
+	tex.height = 32
+	_embers.texture = tex
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_embers.material = mat
+	add_child(_embers)
+
+
+func _layout_background() -> void:
+	if _embers == null:
+		return
+	var vs := get_viewport().get_visible_rect().size
+	_embers.position = Vector2(vs.x * 0.5, vs.y * 0.99)
+	_embers.emission_rect_extents = Vector2(vs.x * 0.52, 8.0)
 
 
 func _build_shell() -> void:
@@ -126,37 +245,42 @@ func _build_shell() -> void:
 	shell.add_child(header)
 
 	var brand := VBoxContainer.new()
-	brand.add_theme_constant_override("separation", 0)
+	brand.add_theme_constant_override("separation", 1)
 	header.add_child(brand)
 	var logo := Label.new()
 	logo.text = "HORDAVIA"
-	logo.add_theme_font_size_override("font_size", 38)
-	logo.add_theme_color_override("font_color", Color(0.82, 1.0, 0.88))
+	logo.add_theme_font_size_override("font_size", 40)
+	logo.add_theme_color_override("font_color", Color(1.0, 0.92, 0.82))
 	brand.add_child(logo)
 	var tag := Label.new()
-	tag.text = "SUPERVIVENCIA SIN FIN  ·  HUB DE EXPEDICIONES"
-	tag.add_theme_font_size_override("font_size", 12)
-	tag.add_theme_color_override("font_color", Color(0.62, 0.80, 0.76, 0.82))
+	tag.text = "SUPERVIVENCIA SIN FIN"
+	tag.add_theme_font_size_override("font_size", 11)
+	tag.add_theme_color_override("font_color", C_MUTED)
 	brand.add_child(tag)
+	var brand_line := ColorRect.new()
+	brand_line.color = Color(1.0, 0.45, 0.10, 0.75)
+	brand_line.custom_minimum_size = Vector2(150, 2)
+	brand.add_child(brand_line)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(spacer)
 
 	_resume_btn = _button(header, "▶  VOLVER AL JUEGO", func() -> void: resume_requested.emit(), 190, 42)
-	_resume_btn.add_theme_stylebox_override("normal", _style(Color(0.10, 0.26, 0.18, 0.95), Color(0.40, 0.90, 0.58), 2))
-	_resume_btn.add_theme_color_override("font_color", Color(0.80, 1.0, 0.86))
+	_resume_btn.name = "ResumeButton"
+	_resume_btn.add_theme_stylebox_override("normal", _style(Color(0.18, 0.10, 0.03, 0.95), C_AMBER, 2))
+	_resume_btn.add_theme_color_override("font_color", C_AMBER_SOFT)
 	_resume_btn.visible = false
 
 	_coins = Label.new()
 	_coins.add_theme_font_size_override("font_size", 20)
-	_coins.add_theme_color_override("font_color", Color(1.0, 0.86, 0.34))
+	_coins.add_theme_color_override("font_color", C_AMBER_SOFT)
 	_coins.custom_minimum_size.x = 190
 	_coins.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(_coins)
 
 	var accent := ColorRect.new()
-	accent.color = Color(0.22, 0.62, 0.52, 0.65)
+	accent.color = Color(1.0, 0.38, 0.08, 0.55)
 	accent.custom_minimum_size = Vector2(0, 2)
 	shell.add_child(accent)
 
@@ -164,16 +288,16 @@ func _build_shell() -> void:
 	nav.add_theme_constant_override("separation", 6)
 	shell.add_child(nav)
 	for id in TAB_IDS:
-		var b := _button(nav, String(NAV_LABELS[id]), select_tab.bind(id), 124, 38)
+		var b := _button(nav, String(NAV_LABELS[id]), select_tab.bind(id), 124, 36)
 		b.add_theme_font_size_override("font_size", 12)
 		_nav_buttons[id] = b
-	var quit := _button(nav, "SALIR", func() -> void: quit_requested.emit(), 76, 38)
+	var quit := _button(nav, "SALIR", func() -> void: quit_requested.emit(), 76, 36)
 	quit.add_theme_font_size_override("font_size", 12)
-	quit.add_theme_color_override("font_color", Color(1.0, 0.58, 0.52))
+	quit.add_theme_color_override("font_color", Color(1.0, 0.50, 0.40))
 
 	var panel := PanelContainer.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", _style(Color(0.035, 0.045, 0.065, 0.94), Color(0.18, 0.27, 0.32, 0.85), 1, 10))
+	panel.add_theme_stylebox_override("panel", _style(C_PANEL, C_BORDER, 1, 14))
 	shell.add_child(panel)
 
 	var pad := MarginContainer.new()
@@ -189,12 +313,12 @@ func _build_shell() -> void:
 
 	_title = Label.new()
 	_title.add_theme_font_size_override("font_size", 25)
-	_title.add_theme_color_override("font_color", Color(0.88, 1.0, 0.92))
+	_title.add_theme_color_override("font_color", Color(1.0, 0.90, 0.78))
 	body.add_child(_title)
 
 	_subtitle = Label.new()
 	_subtitle.add_theme_font_size_override("font_size", 12)
-	_subtitle.add_theme_color_override("font_color", Color(0.70, 0.80, 0.84, 0.80))
+	_subtitle.add_theme_color_override("font_color", C_MUTED)
 	body.add_child(_subtitle)
 
 	_scroll = ScrollContainer.new()
@@ -209,21 +333,24 @@ func _build_shell() -> void:
 	_scroll.add_child(_content)
 
 	var footer := Label.new()
-	footer.text = "WASD / joystick · C cambia cámara · ESC o ☰ pausa · Todo el progreso se guarda solo"
+	footer.text = "WASD / joystick  ·  C cámara  ·  ESC o ☰ pausa  ·  guardado automático"
 	footer.add_theme_font_size_override("font_size", 10)
-	footer.add_theme_color_override("font_color", Color(1, 1, 1, 0.38))
+	footer.add_theme_color_override("font_color", Color(1, 1, 1, 0.34))
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shell.add_child(footer)
 
 
 func _apply_safe_area() -> void:
+	_layout_background()
 	if _margin == null:
 		return
+	var vs := get_viewport().get_visible_rect().size
+	if vs.x > 0.0 and vs.y > 0.0 and size != vs:
+		set_deferred("size", vs)
 	var safe := DisplayServer.get_display_safe_area()
 	var win := DisplayServer.window_get_size()
 	if win.x <= 0 or win.y <= 0:
 		return
-	var vs := get_viewport().get_visible_rect().size
 	var sx := vs.x / float(win.x)
 	var sy := vs.y / float(win.y)
 	var left := maxf(float(safe.position.x) * sx, 0.0)
@@ -251,12 +378,13 @@ func _button(parent: Node, text: String, action: Callable, width: float = 0.0, h
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", 14)
+	b.add_theme_color_override("font_color", C_TEXT)
 	if width > 0.0:
 		b.custom_minimum_size.x = width
 	b.custom_minimum_size.y = height
-	b.add_theme_stylebox_override("normal", _style(Color(0.08, 0.10, 0.14, 0.92), Color(0.20, 0.26, 0.30), 1))
-	b.add_theme_stylebox_override("hover", _style(Color(0.12, 0.17, 0.20, 0.96), Color(0.35, 0.62, 0.52), 1))
-	b.add_theme_stylebox_override("pressed", _style(Color(0.10, 0.22, 0.18, 1.0), Color(0.45, 0.90, 0.62), 2))
+	b.add_theme_stylebox_override("normal", _style(Color(0.055, 0.045, 0.035, 0.88), Color(0.24, 0.18, 0.13, 0.95), 1))
+	b.add_theme_stylebox_override("hover", _style(Color(0.12, 0.075, 0.035, 0.96), C_AMBER, 1))
+	b.add_theme_stylebox_override("pressed", _style(Color(0.22, 0.12, 0.04, 1.0), C_AMBER_SOFT, 2))
 	b.pressed.connect(action)
 	parent.add_child(b)
 	return b
@@ -265,10 +393,10 @@ func _button(parent: Node, text: String, action: Callable, width: float = 0.0, h
 func _primary(parent: Node, text: String, action: Callable, width: float = 0.0, height: float = 52.0) -> Button:
 	var b := _button(parent, text, action, width, height)
 	b.add_theme_font_size_override("font_size", 20)
-	b.add_theme_color_override("font_color", Color(0.04, 0.10, 0.07))
-	b.add_theme_stylebox_override("normal", _style(Color(0.38, 0.78, 0.56), Color(0.68, 1.0, 0.80), 2))
-	b.add_theme_stylebox_override("hover", _style(Color(0.50, 0.92, 0.66), Color(0.85, 1.0, 0.90), 2))
-	b.add_theme_stylebox_override("pressed", _style(Color(0.26, 0.62, 0.44), Color(0.70, 1.0, 0.80), 2))
+	b.add_theme_color_override("font_color", Color(0.10, 0.05, 0.01))
+	b.add_theme_stylebox_override("normal", _style(Color(0.95, 0.55, 0.16), Color(1.0, 0.86, 0.52), 2))
+	b.add_theme_stylebox_override("hover", _style(Color(1.0, 0.68, 0.28), Color(1.0, 0.95, 0.75), 2))
+	b.add_theme_stylebox_override("pressed", _style(Color(0.78, 0.40, 0.09), Color(1.0, 0.80, 0.40), 2))
 	return b
 
 
@@ -283,9 +411,9 @@ func _label(parent: Node, text: String, size: int = 13, color: Color = Color(1, 
 	return l
 
 
-func _card(parent: Node, min_width: float = 0.0, border: Color = Color(0.16, 0.22, 0.27)) -> VBoxContainer:
+func _card(parent: Node, min_width: float = 0.0, border: Color = C_BORDER) -> VBoxContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _style(Color(0.055, 0.070, 0.095, 0.88), border, 1, 8))
+	p.add_theme_stylebox_override("panel", _style(Color(0.035, 0.028, 0.022, 0.80), border, 1, 10))
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if min_width > 0.0:
 		p.custom_minimum_size.x = min_width
@@ -311,13 +439,13 @@ func _clear(node: Node) -> void:
 
 
 func _selected_button(b: Button) -> void:
-	b.add_theme_stylebox_override("normal", _style(Color(0.08, 0.22, 0.16, 1.0), Color(0.42, 0.95, 0.64), 2))
-	b.add_theme_color_override("font_color", Color(0.78, 1.0, 0.86))
+	b.add_theme_stylebox_override("normal", _style(Color(0.20, 0.11, 0.04, 1.0), C_AMBER, 2))
+	b.add_theme_color_override("font_color", C_AMBER_SOFT)
 
 
 func _unselected_button(b: Button) -> void:
-	b.add_theme_stylebox_override("normal", _style(Color(0.08, 0.10, 0.14, 0.92), Color(0.20, 0.26, 0.30), 1))
-	b.add_theme_color_override("font_color", Color(1, 1, 1, 0.86))
+	b.add_theme_stylebox_override("normal", _style(Color(0.055, 0.045, 0.035, 0.88), Color(0.24, 0.18, 0.13, 0.95), 1))
+	b.add_theme_color_override("font_color", C_TEXT)
 
 
 func _style_nav() -> void:
@@ -367,15 +495,24 @@ func _render_tab() -> void:
 
 
 func _render_play() -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_content.add_child(row)
+	var hero := _card(_content, 0.0, Color(0.62, 0.34, 0.12))
+	hero.add_theme_constant_override("separation", 10)
+	_label(hero, "LA HORDA NO DUERME", 30, Color(1.0, 0.92, 0.82))
+	_label(hero, "Sobrevive sin límite de tiempo. Cada 6 minutos el mundo cambia de bioma, el clima se vuelve hostil y los jefes escalan. Solo la muerte termina la partida.", 13, C_MUTED)
 
-	var left := _card(row, 0.0, Color(0.20, 0.38, 0.31))
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_label(left, "EXPEDICIÓN", 24, Color(0.82, 1.0, 0.88))
-	_label(left, "Sobrevive sin límite de tiempo. Cada 6 minutos el mundo cambia de bioma, el clima se vuelve hostil y los jefes escalan. Solo la muerte termina la partida.", 13, Color(1, 1, 1, 0.72))
+	if GameState.run_active:
+		var cont := _button(hero, "▶  CONTINUAR PARTIDA", func() -> void: resume_requested.emit(), 0.0, 54)
+		cont.name = "ContinueButton"
+		cont.add_theme_font_size_override("font_size", 20)
+		var again := _button(hero, "Empezar una expedición nueva", func() -> void: play_requested.emit(), 0.0, 40)
+		again.add_theme_font_size_override("font_size", 14)
+	var play := _primary(hero, "EMPEZAR EXPEDICIÓN", func() -> void: play_requested.emit(), 0.0, 76)
+	play.name = "PlayButton"
+	play.add_theme_font_size_override("font_size", 26)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content.add_child(row)
 
 	var ch: Dictionary = ContentDB.characters.get(SaveManager.character, {})
 	var cur: Dictionary = {}
@@ -383,47 +520,25 @@ func _render_play() -> void:
 		if String(c.get("id", "")) == String(SaveManager.settings.get("curse", "ninguna")):
 			cur = c
 			break
-	_label(left, "PERSONAJE · %s" % String(ch.get("name", "Vagabundo")), 17, Color(0.66, 1.0, 0.78))
-	_label(left, "HP %d   ·   Velocidad %.1f   ·   Daño x%.2f   ·   Cadencia x%.2f\n%s" % [
-		int(ch.get("hp", 100)), float(ch.get("speed", 6.0)),
-		float(ch.get("dmg", 1.0)), float(ch.get("fire", 1.0)), String(ch.get("desc", "")),
-	], 12, Color(1, 1, 1, 0.70))
-	_label(left, "MALDICIÓN · %s" % String(cur.get("name", "Sin maldición")), 17, Color(1.0, 0.72, 0.46))
-	_label(left, "%s\nRecompensa de monedas: +%d%%" % [
-		String(cur.get("desc", "Experiencia estándar")), int(round(float(cur.get("coins", 0.0)) * 100.0)),
-	], 12, Color(1, 1, 1, 0.66))
+	_stat_chip(row, "PERSONAJE", String(ch.get("name", "Vagabundo")),
+		"%d HP  ·  vel %.1f" % [int(ch.get("hp", 100)), float(ch.get("speed", 6.0))])
+	_stat_chip(row, "MALDICIÓN", String(cur.get("name", "Sin maldición")),
+		"monedas +%d%%" % int(round(float(cur.get("coins", 0.0)) * 100.0)))
+	_stat_chip(row, "RÉCORD", "%d:%02d" % [int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60],
+		"%d bajas  ·  %d jefes" % [SaveManager.total_kills, SaveManager.boss_kills])
 
-	if GameState.run_active:
-		_primary(left, "▶  CONTINUAR PARTIDA", func() -> void: resume_requested.emit(), 0.0, 50)
-		var new_run := _button(left, "Empezar una expedición nueva", func() -> void: play_requested.emit(), 0.0, 40)
-		new_run.add_theme_font_size_override("font_size", 14)
-	else:
-		_primary(left, "EMPEZAR EXPEDICIÓN", func() -> void: play_requested.emit(), 0.0, 56)
-	_label(left, "Récord: %d:%02d   ·   Bajas totales: %d   ·   Jefes: %d" % [
-		int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60,
-		SaveManager.total_kills, SaveManager.boss_kills,
-	], 12, Color(0.68, 0.84, 1.0, 0.82))
-	_label(left, "Armas %d · Evoluciones %d · Pasivas %d · Bestias %d" % [
+	_label(_content, "Armas %d  ·  Evoluciones %d  ·  Pasivas %d  ·  Bestias %d  ·  7 biomas en ciclo de 42 min" % [
 		ContentDB.weapons.size(), ContentDB.evolutions.size(),
 		ContentDB.upgrades.size(), ContentDB.enemies.size(),
-	], 11, Color(1, 1, 1, 0.50))
+	], 11, Color(0.80, 0.72, 0.62, 0.72))
 
-	var right := _card(row, 450.0, Color(0.24, 0.27, 0.42))
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_label(right, "HORIZONTE DE 7 BIOMAS", 18, Color(0.74, 0.86, 1.0))
-	_label(right, "El ciclo completo dura 42 minutos y vuelve a empezar con enemigos más fuertes.", 11, Color(1, 1, 1, 0.60))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	right.add_child(grid)
-	for i in ContentDB.biomes.size():
-		var b: Dictionary = ContentDB.biomes[i]
-		var w: Dictionary = b.get("weather", {}) if b.get("weather", {}) is Dictionary else {}
-		var bv := _card(grid, 190.0, Color(0.16, 0.20, 0.30))
-		_label(bv, "%d. %s" % [i + 1, String(b.get("name", ""))], 13, Color(0.84, 1.0, 0.90))
-		_label(bv, "6 min · %s" % String(w.get("label", "Despejado")), 10, Color(0.68, 0.82, 0.94, 0.80))
-	_label(right, "El clima ralentiza ligeramente el movimiento y reduce la visibilidad: aprovéchalo o sufre sus consecuencias.", 11, Color(1, 1, 1, 0.48))
+
+func _stat_chip(parent: Node, title: String, value: String, sub: String) -> void:
+	var c := _card(parent, 0.0, Color(0.34, 0.22, 0.12))
+	c.add_theme_constant_override("separation", 2)
+	_label(c, title, 10, Color(0.76, 0.62, 0.46))
+	_label(c, value, 19, Color(1.0, 0.88, 0.70))
+	_label(c, sub, 10, C_MUTED)
 
 
 func _render_characters() -> void:
