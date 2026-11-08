@@ -58,6 +58,7 @@ var _hub_resume_btn: Button
 var _hub_tab := "jugar"
 var _hub_codex_sub := "armas"
 var _weather_label: Label
+var _contract_label: Label
 
 # Cachés de UI: solo se reconstruyen textos cuando cambia el valor (evita
 # formatear strings y re-layout cada frame).
@@ -89,6 +90,8 @@ func _ready() -> void:
 	GameState.leveled.connect(_on_leveled)
 	GameState.run_ended.connect(_on_run_ended)
 	GameState.run_started.connect(_on_run_started)
+	GameState.contract_changed.connect(_refresh_contract)
+	GameState.contract_completed.connect(_on_contract_completed)
 	SaveManager.achievements_unlocked.connect(_on_achievements_unlocked)
 	_apply_safe_area()
 	get_viewport().size_changed.connect(_apply_safe_area)
@@ -122,6 +125,12 @@ func _build_hud() -> void:
 	_weather_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_weather_label.position = Vector2(16, 98)
 	_weather_label.text = ""
+
+	_contract_label = _label(root, 12, Color(1.0, 0.82, 0.45))
+	_contract_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_contract_label.position = Vector2(16, 120)
+	_contract_label.text = ""
+	_contract_label.visible = false
 
 	_coins_label = _label(root, 16, Color(1, 0.95, 0.4))
 	_coins_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -547,6 +556,8 @@ func _on_leveled(choices: Array) -> void:
 	get_tree().paused = true
 	if GameState.card_source == "cofre":
 		_levelup_title.text = "¡COFRE ABIERTO! — elige una mejora"
+	elif GameState.card_source == "reliquia":
+		_levelup_title.text = "¡RECOMPENSA DE JEFE! — elige una reliquia"
 	else:
 		_levelup_title.text = "¡NIVEL %d! — elige una mejora" % GameState.level
 	_render_cards(choices)
@@ -595,7 +606,10 @@ func _update_footer() -> void:
 func _reroll() -> void:
 	if not GameState.use_reroll():
 		return
-	var choices := ContentDB.roll_upgrades(GameState.upgrade_counts)
+	var choices: Array = (
+		ContentDB.roll_relics(3) if GameState.card_source == "reliquia"
+		else ContentDB.roll_upgrades(GameState.upgrade_counts)
+	)
 	if choices.is_empty():
 		return
 	AudioManager.play_sfx("pickup", 1.25)
@@ -743,6 +757,28 @@ func _on_achievements_unlocked(list: Array) -> void:
 	AudioManager.play_sfx("levelup", 1.4)
 
 
+func _refresh_contract() -> void:
+	if _contract_label == null:
+		return
+	var contract := ContentDB.contract_def(GameState.contract_id)
+	if not GameState.run_active or contract.is_empty():
+		_contract_label.visible = false
+		return
+	var goal := int(contract.get("goal", 1))
+	var status := "✓" if GameState.contract_is_complete else "%d/%d" % [GameState.contract_progress, goal]
+	_contract_label.text = "Contrato: %s  %s" % [String(contract.get("name", "")), status]
+	_contract_label.visible = true
+
+
+func _on_contract_completed(contract: Dictionary) -> void:
+	_refresh_contract()
+	_biome_label.text = "CONTRATO CUMPLIDO: %s   ◈ +%d" % [
+		String(contract.get("name", "")), int(contract.get("reward", 0)),
+	]
+	_biome_t = 3.5
+	AudioManager.play_sfx("levelup", 1.3)
+
+
 func _on_run_ended(result: Dictionary) -> void:
 	_start_root.visible = false
 	_menu_root.visible = false
@@ -777,17 +813,26 @@ func _on_run_ended(result: Dictionary) -> void:
 		var shown := parts.slice(0, 3)
 		var extra := "" if parts.size() <= 3 else "  +%d más" % (parts.size() - 3)
 		ach_line = "\nLogros: %s%s   ◈ +%d" % [", ".join(shown), extra, reward]
+	var contract_line := ""
+	var contract: Dictionary = result.get("contract", {})
+	if not String(contract.get("id", "")).is_empty():
+		var def := ContentDB.contract_def(String(contract.get("id", "")))
+		contract_line = "\nContrato %s: %s (%d/%d)" % [
+			"COMPLETADO" if bool(contract.get("completed", false)) else "fallido",
+			String(def.get("name", contract.get("id", ""))),
+			int(contract.get("progress", 0)), int(def.get("goal", 0)),
+		]
 	_over_stats.text = (
 		"Tiempo: %d:%02d   Nivel: %d   Bajas: %d\n"
 		+ "Daño: %s   Jefes: %d   Ciclo: %d   Monedas: %d\n"
 		+ "Mejor tiempo: %d:%02d   Monedas totales: %d\n"
-		+ "%s%s%s"
+		+ "%s%s%s%s"
 	) % [
 		mins, secs, int(result["level"]), int(result["kills"]),
 		_fmt_num(float(result.get("damage", 0.0))), int(result.get("bosses", 0)),
 		int(result.get("loop", 0)), int(result["coins"]),
 		int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60, SaveManager.total_coins,
-		_run_build(result), rec_line, ach_line,
+		_run_build(result), rec_line, ach_line, contract_line,
 	]
 
 
@@ -805,7 +850,12 @@ func _run_build(result: Dictionary) -> String:
 	var passive_total := 0
 	for k in ups:
 		passive_total += int(ups[k])
-	return "Build: %s · %d pasivas" % [", ".join(parts), passive_total]
+	var relic_names: Array[String] = []
+	for id in result.get("relics", []):
+		var relic := ContentDB.relic_def(String(id))
+		relic_names.append(String(relic.get("name", id)))
+	var relic_line := "" if relic_names.is_empty() else "\nReliquias: %s" % ", ".join(relic_names)
+	return "Build: %s · %d pasivas%s" % [", ".join(parts), passive_total, relic_line]
 
 
 func _fmt_num(v: float) -> String:
@@ -827,6 +877,7 @@ func _on_run_started() -> void:
 	_menu_root.visible = false
 	GameState.overlay_open = false
 	_menu_open = false
+	_refresh_contract()
 
 
 func _on_xp(xp: int, needed: int) -> void:

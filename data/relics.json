@@ -1,0 +1,47 @@
+[
+	{
+		"id": "brasa_eterna",
+		"name": "Brasa eterna",
+		"desc": "+30% daño global, pero −20 de vida máxima.",
+		"effects": [
+			{ "stat": "dmg_mult", "operation": "multiply", "value": 1.3 },
+			{ "stat": "max_hp", "operation": "add", "value": -20 }
+		]
+	},
+	{
+		"id": "nucleo_tormenta",
+		"name": "Núcleo de tormenta",
+		"desc": "+25% cadencia, pero −0.7 de velocidad.",
+		"effects": [
+			{ "stat": "fire_mult", "operation": "multiply", "value": 1.25 },
+			{ "stat": "move_speed", "operation": "add", "value": -0.7 }
+		]
+	},
+	{
+		"id": "coraza_coloso",
+		"name": "Coraza del coloso",
+		"desc": "+15% armadura, pero −15% cadencia.",
+		"effects": [
+			{ "stat": "armor", "operation": "add", "value": 0.15 },
+			{ "stat": "fire_mult", "operation": "multiply", "value": 0.85 }
+		]
+	},
+	{
+		"id": "fortuna_sangrienta",
+		"name": "Fortuna sangrienta",
+		"desc": "+50% monedas, pero −15% daño global.",
+		"effects": [
+			{ "stat": "coin_mult", "operation": "multiply", "value": 1.5 },
+			{ "stat": "dmg_mult", "operation": "multiply", "value": 0.85 }
+		]
+	},
+	{
+		"id": "botas_cazador",
+		"name": "Botas del cazador",
+		"desc": "+1.2 de velocidad, pero −15 de vida máxima.",
+		"effects": [
+			{ "stat": "move_speed", "operation": "add", "value": 1.2 },
+			{ "stat": "max_hp", "operation": "add", "value": -15 }
+		]
+	}
+]

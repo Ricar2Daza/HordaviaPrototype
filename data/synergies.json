@@ -1,0 +1,9 @@
+[
+	{ "id": "ignicion", "name": "Ignición", "tags": ["fuego"], "need": 3, "max_stacks": 8, "dmg_per": 0.05, "area_per": 0.03, "desc": "+5% daño y +3% área por pieza de fuego" },
+	{ "id": "escarcha", "name": "Escarcha", "tags": ["hielo"], "need": 3, "max_stacks": 6, "area_per": 0.04, "crit_per": 0.02, "desc": "+4% área y +2% crítico por pieza de hielo" },
+	{ "id": "filos", "name": "Filos gemelos", "tags": ["filo"], "need": 3, "max_stacks": 8, "dmg_per": 0.02, "crit_per": 0.025, "desc": "+2% daño y +2.5% crítico por pieza de filo" },
+	{ "id": "tormenta", "name": "Tormenta", "tags": ["tormenta"], "need": 3, "max_stacks": 8, "fire_per": 0.06, "proj_speed_per": 0.03, "desc": "+6% cadencia y +3% velocidad de proyectil por pieza de tormenta" },
+	{ "id": "arcano", "name": "Arcano", "tags": ["arcano"], "need": 3, "max_stacks": 8, "dmg_per": 0.04, "proj_speed_per": 0.04, "desc": "+4% daño y +4% velocidad de proyectil por pieza arcana" },
+	{ "id": "pesado", "name": "Peso muerto", "tags": ["pesado"], "need": 3, "max_stacks": 8, "area_per": 0.04, "armor_per": 0.015, "desc": "+4% área y +1.5% armadura por pieza pesada" },
+	{ "id": "sangre", "name": "Sed de sangre", "tags": ["sangre"], "need": 3, "max_stacks": 6, "lifesteal_per": 0.08, "dmg_per": 0.02, "desc": "+0.08 vida por baja y +2% daño por pieza de sangre" }
+]

@@ -1,0 +1,23 @@
+{
+	"fury": {
+		"max": 100.0,
+		"per_kill": 1.4,
+		"per_damage": 5.0,
+		"per_level": 8.0,
+		"duration": 8.0,
+		"dmg_mult": 1.5,
+		"fire_mult": 1.25
+	},
+	"xp_curve": {
+		"base": 5.0,
+		"factor": 6.0,
+		"exponent": 1.6
+	},
+	"synergy": {
+		"default_need": 3
+	},
+	"telemetry": {
+		"enabled": true,
+		"max_entries": 200
+	}
+}

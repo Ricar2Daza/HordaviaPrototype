@@ -531,6 +531,34 @@ func _render_play() -> void:
 		ContentDB.weapons.size(), ContentDB.evolutions.size(),
 		ContentDB.upgrades.size(), ContentDB.enemies.size(),
 	], 11, Color(0.80, 0.72, 0.62, 0.72))
+	_render_contracts()
+
+
+func _render_contracts() -> void:
+	_label(_content, "CONTRATO DE EXPEDICIÓN", 18, C_AMBER_SOFT)
+	_label(_content, "Elige un objetivo opcional. Al cumplirlo, recibes monedas durante la run.", 11, C_MUTED)
+	var selected := String(SaveManager.settings.get("contract", ""))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	_content.add_child(grid)
+	var none := _card(grid, 220.0, C_BORDER if selected != "" else C_AMBER)
+	_label(none, "Sin contrato", 16, C_TEXT)
+	_label(none, "Juega sin objetivo adicional.", 11, C_MUTED)
+	var none_btn := _button(none, "ACTIVO" if selected == "" else "ELEGIR", _select_contract.bind(""), 0.0, 36)
+	if selected == "":
+		_selected_button(none_btn)
+	for contract in ContentDB.contracts:
+		var id := String(contract.get("id", ""))
+		var active := selected == id
+		var card := _card(grid, 220.0, C_AMBER if active else C_BORDER)
+		_label(card, String(contract.get("name", id)), 16, C_TEXT)
+		_label(card, String(contract.get("desc", "")), 11, C_MUTED)
+		_label(card, "Recompensa: ◈ %d" % int(contract.get("reward", 0)), 12, C_AMBER_SOFT)
+		var button := _button(card, "ACTIVO" if active else "ELEGIR", _select_contract.bind(id), 0.0, 36)
+		if active:
+			_selected_button(button)
 
 
 func _stat_chip(parent: Node, title: String, value: String, sub: String) -> void:
@@ -613,7 +641,7 @@ func _render_codex() -> void:
 	var subnav := HBoxContainer.new()
 	subnav.add_theme_constant_override("separation", 6)
 	_content.add_child(subnav)
-	var subs := [["armas", "ARMAS"], ["pasivas", "PASIVAS"], ["evoluciones", "EVOLUCIONES"], ["bestiario", "BESTIARIO"]]
+	var subs := [["armas", "ARMAS"], ["pasivas", "PASIVAS"], ["evoluciones", "EVOLUCIONES"], ["bestiario", "BESTIARIO"], ["reliquias", "RELIQUIAS"]]
 	for pair in subs:
 		var val := String(pair[0])
 		var b := _button(subnav, String(pair[1]), _set_codex_sub.bind(val), 128, 34)
@@ -627,6 +655,8 @@ func _render_codex() -> void:
 			_codex_evolutions()
 		"bestiario":
 			_codex_bestiary()
+		"reliquias":
+			_codex_relics()
 		_:
 			_codex_weapons()
 
@@ -708,6 +738,19 @@ func _codex_bestiary() -> void:
 		_label(card, "HP %s · Vel %s · Daño %s" % [
 			_format_num(def.get("hp", 0.0)), _format_num(def.get("speed", 0.0)), _format_num(def.get("dmg", 0.0)),
 		], 10, Color(1, 1, 1, 0.60))
+
+
+func _codex_relics() -> void:
+	_label(_content, "Las reliquias son únicas por run y aparecen al derrotar jefes. Cada una combina una ventaja con un costo.", 12, Color(0.70, 0.86, 1.0, 0.78))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	_content.add_child(grid)
+	for relic in ContentDB.relics:
+		var card := _card(grid, 300.0, RARITY_COLORS["legendario"])
+		_label(card, String(relic.get("name", "")), 16, C_AMBER_SOFT)
+		_label(card, String(relic.get("desc", "")), 11, Color(1, 1, 1, 0.72))
 
 
 func _render_records() -> void:
@@ -830,6 +873,12 @@ func _select_char(id: String) -> void:
 func _select_curse(id: String) -> void:
 	GameState.select_curse(id)
 	AudioManager.play_sfx("pickup", 1.2)
+	refresh()
+
+
+func _select_contract(id: String) -> void:
+	if GameState.select_contract(id):
+		AudioManager.play_sfx("pickup", 1.2)
 	refresh()
 
 

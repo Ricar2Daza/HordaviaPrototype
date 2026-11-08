@@ -13,8 +13,15 @@ var characters: Dictionary = {}   # personajes jugables (roadmap 4.2)
 var meta_upgrades: Array = []     # tienda meta (roadmap 4.1)
 var curses: Array = []            # maldiciones de dificultad (roadmap 4.3)
 var achievements: Array = []      # logros locales (roadmap 4.4)
+var synergies: Array = []         # sinergias por etiquetas (combate)
+var contracts: Array = []
+var relics: Array = []
+var balance: Dictionary = {}      # curva de XP, furia y telemetría
+var tag_pool := {}                # etiqueta → true (para validar sinergias)
 
 const MAX_WEAPON_LEVEL := 8
+const KNOWN_PATTERNS := ["nearest", "orbit", "aura", "boomerang", "mine", "chain",
+	"spiral", "slam", "meteor", "drone", "void"]
 
 
 func _ready() -> void:
@@ -27,7 +34,189 @@ func _ready() -> void:
 	meta_upgrades = _load_array("res://data/meta.json")
 	curses = _load_array("res://data/curses.json")
 	achievements = _load_array("res://data/achievements.json")
+	synergies = _load_array("res://data/synergies.json")
+	contracts = _load_array("res://data/contracts.json")
+	relics = _load_array("res://data/relics.json")
+	balance = _load_dict("res://data/balance.json")
 	_load_biomes()
+	_index_tags()
+	var errs := validate()
+	for e in errs:
+		push_warning("ContentDB: " + e)
+	if GameState != null and GameState.debug_auto_upgrade:
+		print("CONTENT_OK weapons=%d enemies=%d upgrades=%d evolutions=%d synergies=%d tags=%d errors=%d" % [
+			weapons.size(), enemies.size(), upgrades.size(), evolutions.size(),
+			synergies.size(), tag_pool.size(), errs.size(),
+		])
+
+
+func _index_tags() -> void:
+	tag_pool = {}
+	for id in weapons:
+		for t in tags_of(weapons[id]):
+			tag_pool[t] = true
+	for u in upgrades:
+		for t in tags_of(u):
+			tag_pool[t] = true
+
+
+func tags_of(def: Dictionary) -> Array:
+	var raw = def.get("tags", [])
+	return raw if raw is Array else []
+
+
+func upgrade_def(id: String) -> Dictionary:
+	for u in upgrades:
+		if String(u.get("id", "")) == id:
+			return u
+	return {}
+
+
+func contract_def(id: String) -> Dictionary:
+	for contract in contracts:
+		if String(contract.get("id", "")) == id:
+			return contract
+	return {}
+
+
+func relic_def(id: String) -> Dictionary:
+	for relic in relics:
+		if String(relic.get("id", "")) == id:
+			return relic
+	return {}
+
+
+func roll_relics(count: int) -> Array:
+	var pool: Array = []
+	for relic in relics:
+		var id := String(relic.get("id", ""))
+		if not GameState.relic_ids.has(id) and not GameState.banished.has(id):
+			pool.append(relic)
+	pool.shuffle()
+	var choices: Array = []
+	for relic in pool.slice(0, mini(count, pool.size())):
+		var card: Dictionary = relic.duplicate(true)
+		card["effect"] = "relic"
+		card["rarity"] = "legendario"
+		choices.append(card)
+	return choices
+
+
+## Validador de contenido data-driven: devuelve una lista de errores legibles.
+## Se ejecuta al cargar para detectar JSON incoherente sin abrir la escena.
+func validate() -> Array:
+	var errs: Array = []
+	if weapons.is_empty():
+		errs.append("weapons.json vacío")
+	for id in weapons:
+		var w: Dictionary = weapons[id]
+		var pattern := String(w.get("pattern", ""))
+		if pattern.is_empty() or not KNOWN_PATTERNS.has(pattern):
+			errs.append("arma %s: pattern inválido '%s'" % [id, pattern])
+		if String(w.get("display", "")).is_empty():
+			errs.append("arma %s: falta display" % id)
+		if float(w.get("dmg", -1.0)) < 0.0:
+			errs.append("arma %s: dmg inválido" % id)
+	var up_ids := {}
+	for u in upgrades:
+		var uid := String(u.get("id", ""))
+		if uid.is_empty():
+			errs.append("upgrade sin id")
+			continue
+		up_ids[uid] = true
+		if String(u.get("name", "")).is_empty():
+			errs.append("upgrade %s: falta name" % uid)
+		if String(u.get("effect", "")).is_empty():
+			errs.append("upgrade %s: falta effect" % uid)
+		if float(u.get("weight", 0.0)) <= 0.0:
+			errs.append("upgrade %s: weight debe ser > 0" % uid)
+		if int(u.get("max", 0)) < 1:
+			errs.append("upgrade %s: max debe ser >= 1" % uid)
+		if String(u.get("effect", "")) == "weapon":
+			var wid := String(u.get("weapon", ""))
+			if not weapons.has(wid):
+				errs.append("upgrade %s: arma inexistente '%s'" % [uid, wid])
+	for ev in evolutions:
+		var eid := String(ev.get("id", "?"))
+		if not weapons.has(String(ev.get("base", ""))):
+			errs.append("evolución %s: base inexistente" % eid)
+		if not weapons.has(String(ev.get("result", ""))):
+			errs.append("evolución %s: result inexistente" % eid)
+		var passive := String(ev.get("passive", ""))
+		if not passive.is_empty() and not up_ids.has(passive):
+			errs.append("evolución %s: pasiva inexistente '%s'" % [eid, passive])
+	for s in synergies:
+		var sid := String(s.get("id", "?"))
+		var tags = s.get("tags", [])
+		if not (tags is Array) or tags.is_empty():
+			errs.append("sinergia %s: tags vacío" % sid)
+			continue
+		for t in tags:
+			if not tag_pool.has(String(t)):
+				errs.append("sinergia %s: etiqueta desconocida '%s'" % [sid, t])
+		if int(s.get("need", 0)) < 1:
+			errs.append("sinergia %s: need debe ser >= 1" % sid)
+		if int(s.get("max_stacks", 0)) < int(s.get("need", 1)):
+			errs.append("sinergia %s: max_stacks < need" % sid)
+	var contract_ids := {}
+	for c in contracts:
+		if not (c is Dictionary):
+			errs.append("contrato con formato inválido")
+			continue
+		var cid := String(c.get("id", ""))
+		if cid.is_empty() or contract_ids.has(cid):
+			errs.append("contrato sin id o id duplicado '%s'" % cid)
+		contract_ids[cid] = true
+		if String(c.get("name", "")).is_empty():
+			errs.append("contrato %s: falta name" % cid)
+		if not ["kills", "bosses", "time", "relics"].has(String(c.get("stat", ""))):
+			errs.append("contrato %s: stat inválido" % cid)
+		if int(c.get("goal", 0)) < 1 or int(c.get("reward", 0)) < 0:
+			errs.append("contrato %s: goal o reward inválido" % cid)
+	var relic_ids := {}
+	for r in relics:
+		if not (r is Dictionary):
+			errs.append("reliquia con formato inválido")
+			continue
+		var rid := String(r.get("id", ""))
+		if rid.is_empty() or relic_ids.has(rid):
+			errs.append("reliquia sin id o id duplicado '%s'" % rid)
+		relic_ids[rid] = true
+		var effects = r.get("effects", [])
+		if String(r.get("name", "")).is_empty() or not (effects is Array) or effects.is_empty():
+			errs.append("reliquia %s: falta name o effects" % rid)
+			continue
+		for effect in effects:
+			if not (effect is Dictionary):
+				errs.append("reliquia %s: efecto con formato inválido" % rid)
+				continue
+			if not ["dmg_mult", "fire_mult", "max_hp", "move_speed", "armor", "coin_mult"].has(
+					String(effect.get("stat", ""))):
+				errs.append("reliquia %s: stat inválido" % rid)
+			if not ["add", "multiply"].has(String(effect.get("operation", ""))):
+				errs.append("reliquia %s: operation inválida" % rid)
+	for id in enemies:
+		var e: Dictionary = enemies[id]
+		if float(e.get("hp", 0.0)) <= 0.0:
+			errs.append("enemigo %s: hp inválido" % id)
+		if float(e.get("speed", 0.0)) < 0.0:
+			errs.append("enemigo %s: speed inválido" % id)
+	var fury: Dictionary = balance.get("fury", {}) if balance.get("fury", {}) is Dictionary else {}
+	if float(fury.get("max", 0.0)) <= 0.0:
+		errs.append("balance.fury.max debe ser > 0")
+	if float(fury.get("duration", 0.0)) <= 0.0:
+		errs.append("balance.fury.duration debe ser > 0")
+	if float(fury.get("dmg_mult", 0.0)) < 1.0:
+		errs.append("balance.fury.dmg_mult debe ser >= 1")
+	if float(fury.get("fire_mult", 0.0)) < 1.0:
+		errs.append("balance.fury.fire_mult debe ser >= 1")
+	var tel: Dictionary = balance.get("telemetry", {}) if balance.get("telemetry", {}) is Dictionary else {}
+	if int(tel.get("max_entries", 0)) < 10:
+		errs.append("balance.telemetry.max_entries debe ser >= 10")
+	if biomes.is_empty():
+		errs.append("biomes.json vacío")
+	return errs
+
 
 
 func weapon_display(id: String) -> String:

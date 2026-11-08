@@ -15,3 +15,4 @@ contenido 100% original.
 | 6 | [05_EXPORT_ANDROID.md](05_EXPORT_ANDROID.md) | SDK/JDK instalados, preset Android, compilar APK, instalar y firma release |
 | 7 | [../README.md](../README.md) | README del prototipo: compilar, ejecutar, smoke test |
 | 8 | [rea/](rea/) | Artefactos REA: inventario de DLLs, intento de Ghidra (fallido) y guía original |
+| 9 | [FEATURES_POR_AGREGAR.md](FEATURES_POR_AGREGAR.md) | Features añadidas y siguiente backlog de gameplay |

@@ -14,6 +14,10 @@ signal run_started
 signal biome_changed(b: Dictionary)
 signal setting_changed
 signal kill_event(pos: Vector3, elite: bool)
+signal fury_changed
+signal synergies_changed(list: Array)
+signal contract_changed
+signal contract_completed(definition: Dictionary)
 
 # --- Referencias globales de escena (registradas por world/Main) ---
 var terrain: TerrainField = null  # mundo procedural con height_at(x, z) (world/terrain.gd)
@@ -27,6 +31,11 @@ var weather_speed_mult := 1.0     # penalización suave de movimiento por clima
 var camera_mode := "fija"         # "fija" | "mouse" (WASD y joystick son cámara-relativos)
 var card_source := "nivel"        # origen de las cartas: "nivel" | "cofre"
 var overlay_open := false         # true si HUD tiene la pausa de cartas abierta
+var contract_id := ""
+var contract_progress := 0
+var contract_is_complete := false
+var relic_ids: Array[String] = []
+var _contract_time_sample := 0
 var rerolls := 1                  # consumibles por run (roadmap 2.3)
 var banishes := 1
 var banished: Array[String] = []  # ids desterrados esta run (fuera del pool)
@@ -50,6 +59,32 @@ var crit_dmg := 2.0               # multiplicador de crítico
 var execute_bonus := 0.0          # daño extra a enemigos heridos
 var chill_chance := 0.0           # probabilidad de ralentizar al golpear
 var proj_speed_mult := 1.0        # velocidad de proyectiles
+# --- Combate: medidor de furia y sinergias por etiquetas ---
+var fury := 0.0                   # 0..fury_max; se llena con bajas/daño/niveles
+var fury_max := 100.0
+var fury_active := false
+var fury_t := 0.0                 # segundos restantes de furia
+var fury_uses := 0                # activaciones en la run (resumen)
+var synergy_counts := {}          # etiqueta → piezas equipadas
+var active_synergies: Array = []  # sinergias activas con stacks
+var synergy_dmg_mult := 1.0
+var synergy_fire_mult := 1.0
+var synergy_area_mult := 1.0
+var synergy_proj_mult := 1.0
+var synergy_crit := 0.0
+var synergy_lifesteal := 0.0
+var synergy_armor := 0.0
+var _fury_per_kill := 1.4
+var _fury_per_damage := 5.0
+var _fury_per_level := 8.0
+var _fury_duration := 8.0
+var _fury_dmg_mult := 1.5
+var _fury_fire_mult := 1.25
+var _xp_base := 5.0
+var _xp_factor := 6.0
+var _xp_exp := 1.6
+var _known_synergy_ids: Array[String] = []
+var _smoke_combat_done := false
 # --- Récords de la run y accesibilidad ---
 var damage_dealt := 0.0           # daño total infligido en la run (récord/resumen)
 var screen_shake := 1.0           # 0 = off, 0.5 = suave, 1 = normal (persistente)
@@ -148,6 +183,43 @@ func select_curse(id: String) -> void:
 			SaveManager.save_settings({"curse": id})
 			setting_changed.emit()
 			return
+
+
+func select_contract(id: String) -> bool:
+	if id == "" or id == "ninguno":
+		SaveManager.save_settings({"contract": ""})
+		return true
+	if ContentDB.contract_def(id).is_empty():
+		return false
+	SaveManager.save_settings({"contract": id})
+	return true
+
+
+func _setup_contract() -> void:
+	contract_id = String(SaveManager.settings.get("contract", ""))
+	if ContentDB.contract_def(contract_id).is_empty():
+		contract_id = ""
+	contract_progress = 0
+	contract_is_complete = false
+	_contract_time_sample = 0
+	relic_ids = []
+	contract_changed.emit()
+
+
+func update_contract_progress(stat: String, progress: int) -> void:
+	if not run_active or contract_id.is_empty() or contract_is_complete:
+		return
+	var contract := ContentDB.contract_def(contract_id)
+	if contract.is_empty() or String(contract.get("stat", "")) != stat:
+		return
+	contract_progress = mini(maxi(progress, 0), int(contract.get("goal", 1)))
+	if contract_progress >= int(contract.get("goal", 1)):
+		contract_is_complete = true
+		coins += int(contract.get("reward", 0))
+	contract_changed.emit()
+	if contract_is_complete:
+		contract_completed.emit(contract)
+
 
 # --- Stats de run (afectados por upgrades) ---
 var move_speed := 6.0
@@ -310,15 +382,19 @@ func _process(delta: float) -> void:
 		])
 	if run_active and not get_tree().paused:
 		run_time += delta
+		var whole_seconds := int(run_time)
+		if whole_seconds > _contract_time_sample:
+			_contract_time_sample = whole_seconds
+			update_contract_progress("time", whole_seconds)
 		if debug_auto_upgrade and run_time > 75.0:
 			_end_smoke()
 	elif debug_auto_upgrade and not run_active and last_result.has("time"):
 		_end_smoke()
 
 
-static func xp_to_next(lvl: int) -> int:
-	# Curva suave: 5 + 6*lvl^1.6 (ajustable en balance)
-	return int(5.0 + 6.0 * pow(float(lvl), 1.6))
+func xp_to_next(lvl: int) -> int:
+	# Curva suave: base + factor*lvl^exp (ajustable en data/balance.json)
+	return int(_xp_base + _xp_factor * pow(float(lvl), _xp_exp))
 
 
 func _notification(what: int) -> void:
@@ -338,6 +414,8 @@ func _ready() -> void:
 	_detect_device()
 	# Diferido: SaveManager carga settings después de este _ready.
 	call_deferred("apply_saved_display")
+	call_deferred("_load_balance")
+	upgrades_changed.connect(_recompute_synergies)
 
 
 ## Opciones de rendimiento (roadmap 5.4) guardadas: FPS y calidad Auto/Baja/Media/Alta.
@@ -442,7 +520,139 @@ func _apply_tier(tier: String) -> void:
 			camera_far = 170.0
 
 
+## Carga los valores de data/balance.json (furia, curva XP, telemetría).
+## Se llama diferido al arrancar y otra vez al iniciar run por si cambió el JSON.
+func _load_balance() -> void:
+	if ContentDB == null:
+		return
+	var b: Dictionary = ContentDB.balance
+	var f: Dictionary = b.get("fury", {}) if b.get("fury", {}) is Dictionary else {}
+	fury_max = maxf(float(f.get("max", 100.0)), 1.0)
+	_fury_per_kill = float(f.get("per_kill", 1.4))
+	_fury_per_damage = float(f.get("per_damage", 5.0))
+	_fury_per_level = float(f.get("per_level", 8.0))
+	_fury_duration = maxf(float(f.get("duration", 8.0)), 0.5)
+	_fury_dmg_mult = maxf(float(f.get("dmg_mult", 1.5)), 1.0)
+	_fury_fire_mult = maxf(float(f.get("fire_mult", 1.25)), 1.0)
+	var xp: Dictionary = b.get("xp_curve", {}) if b.get("xp_curve", {}) is Dictionary else {}
+	_xp_base = float(xp.get("base", 5.0))
+	_xp_factor = float(xp.get("factor", 6.0))
+	_xp_exp = maxf(float(xp.get("exponent", 1.6)), 0.1)
+	if SaveManager != null:
+		SaveManager.configure_telemetry(b.get("telemetry", {}))
+
+
+## Multiplicadores efectivos: stats base + sinergias + furia.
+func total_area_mult() -> float:
+	return area_mult * synergy_area_mult
+
+
+func effective_crit_chance() -> float:
+	return minf(crit_chance + synergy_crit, 0.75)
+
+
+func effective_lifesteal() -> float:
+	return lifesteal + synergy_lifesteal
+
+
+func effective_armor() -> float:
+	return minf(armor + synergy_armor, 0.75)
+
+
+func fury_dmg_mult() -> float:
+	return _fury_dmg_mult if fury_active else 1.0
+
+
+func fury_fire_mult() -> float:
+	return _fury_fire_mult if fury_active else 1.0
+
+
+## Recalcula etiquetas y sinergias activas. Idempotente: parte de multiplicadores
+## neutros para no acumular bonificaciones al subir de nivel.
+func _recompute_synergies() -> void:
+	if ContentDB == null:
+		return
+	synergy_counts = {}
+	for w in weapons:
+		var wdef: Dictionary = ContentDB.weapons.get(w, {})
+		for t in ContentDB.tags_of(wdef):
+			synergy_counts[t] = int(synergy_counts.get(t, 0)) + 1
+	for id in upgrade_counts:
+		var udef := ContentDB.upgrade_def(String(id))
+		var stacks := int(upgrade_counts[id])
+		for t in ContentDB.tags_of(udef):
+			synergy_counts[t] = int(synergy_counts.get(t, 0)) + stacks
+	synergy_dmg_mult = 1.0
+	synergy_fire_mult = 1.0
+	synergy_area_mult = 1.0
+	synergy_proj_mult = 1.0
+	synergy_crit = 0.0
+	synergy_lifesteal = 0.0
+	synergy_armor = 0.0
+	var active: Array = []
+	for s in ContentDB.synergies:
+		var tags: Array = s.get("tags", []) if s.get("tags", []) is Array else []
+		var stacks := 0
+		for t in tags:
+			stacks = maxi(stacks, int(synergy_counts.get(String(t), 0)))
+		var need := int(s.get("need", 3))
+		if stacks < need:
+			continue
+		var eff := mini(stacks, int(s.get("max_stacks", stacks)))
+		synergy_dmg_mult *= 1.0 + float(s.get("dmg_per", 0.0)) * float(eff)
+		synergy_fire_mult *= 1.0 + float(s.get("fire_per", 0.0)) * float(eff)
+		synergy_area_mult *= 1.0 + float(s.get("area_per", 0.0)) * float(eff)
+		synergy_proj_mult *= 1.0 + float(s.get("proj_speed_per", 0.0)) * float(eff)
+		synergy_crit += float(s.get("crit_per", 0.0)) * float(eff)
+		synergy_lifesteal += float(s.get("lifesteal_per", 0.0)) * float(eff)
+		synergy_armor += float(s.get("armor_per", 0.0)) * float(eff)
+		active.append({
+			"id": String(s.get("id", "")),
+			"name": String(s.get("name", "")),
+			"desc": String(s.get("desc", "")),
+			"stacks": eff,
+		})
+	active_synergies = active
+	var ids: Array[String] = []
+	for s in active:
+		ids.append(String(s.get("id", "")))
+	if ids != _known_synergy_ids:
+		_known_synergy_ids = ids
+		for s in active:
+			if SaveManager != null:
+				SaveManager.log_event("synergy", {
+					"id": s.get("id", ""), "stacks": s.get("stacks", 0),
+					"time": run_time, "level": level,
+				})
+	synergies_changed.emit(active_synergies)
+
+
+func _gain_fury(v: float) -> void:
+	if not run_active or fury_active or v <= 0.0:
+		return
+	var before := fury
+	fury = minf(fury + v, fury_max)
+	if not is_equal_approx(before, fury):
+		fury_changed.emit()
+
+
+## Gasta el medidor lleno y activa la furia (botón táctil o tecla F).
+func activate_fury() -> bool:
+	if not run_active or fury_active or fury < fury_max - 0.01:
+		return false
+	fury = 0.0
+	fury_active = true
+	fury_t = _fury_duration
+	fury_uses += 1
+	AudioManager.play_sfx("levelup", 0.9)
+	if SaveManager != null:
+		SaveManager.log_event("fury", {"time": run_time, "level": level, "uses": fury_uses})
+	fury_changed.emit()
+	return true
+
+
 func start_run() -> void:
+	_load_balance()
 	character_id = String(SaveManager.character)
 	var ch: Dictionary = ContentDB.characters.get(character_id, {})
 	move_speed = float(ch.get("speed", 6.0))
@@ -516,6 +726,7 @@ func start_run() -> void:
 	rerolls += int(m.get("meta_reroll", 0))
 	luck += int(m.get("meta_luck", 0))
 	bosses_killed = 0
+	_setup_contract()
 	level = 1
 	xp = 0
 	run_time = 0.0
@@ -561,6 +772,9 @@ func add_xp(v: int) -> void:
 
 func apply_upgrade(u: Dictionary) -> void:
 	var id := String(u["id"])
+	if String(u.get("effect", "")) == "relic":
+		_apply_relic(id)
+		return
 	upgrade_counts[id] = int(upgrade_counts.get(id, 0)) + 1
 	match String(u["effect"]):
 		"dmg":
@@ -619,6 +833,40 @@ func apply_upgrade(u: Dictionary) -> void:
 			coin_mult += 0.25
 	upgrades_changed.emit()
 	xp_changed.emit(xp, xp_to_next(level))
+
+
+func _apply_relic(id: String) -> void:
+	if relic_ids.has(id):
+		return
+	var relic := ContentDB.relic_def(id)
+	if relic.is_empty():
+		push_error("GameState: reliquia desconocida '%s'" % id)
+		return
+	for effect in relic.get("effects", []):
+		var stat := String(effect.get("stat", ""))
+		var operation := String(effect.get("operation", ""))
+		var value := float(effect.get("value", 0.0))
+		match stat:
+			"dmg_mult":
+				dmg_mult = dmg_mult * value if operation == "multiply" else dmg_mult + value
+			"fire_mult":
+				fire_mult = fire_mult * value if operation == "multiply" else fire_mult + value
+			"coin_mult":
+				coin_mult = coin_mult * value if operation == "multiply" else coin_mult + value
+			"max_hp":
+				max_hp = maxf(max_hp + value, 1.0)
+				if value > 0.0:
+					hp = minf(hp + value, max_hp)
+				else:
+					hp = minf(hp, max_hp)
+				hp_changed.emit(hp, max_hp)
+			"move_speed":
+				move_speed += value
+			"armor":
+				armor = clampf(armor + value, -0.5, 0.75)
+	relic_ids.append(id)
+	update_contract_progress("relics", relic_ids.size())
+	upgrades_changed.emit()
 
 
 ## Consumibles de cartas (roadmap 2.3).
@@ -706,6 +954,7 @@ func add_kill(xp_value: int) -> void:
 	if not run_active:
 		return
 	kills += 1
+	update_contract_progress("kills", kills)
 	coins += maxi(1, int(round(coin_mult)))
 	if lifesteal > 0.0 and hp < max_hp:
 		hp = minf(hp + lifesteal, max_hp)
@@ -734,9 +983,28 @@ func offer_chest_cards() -> void:
 	leveled.emit(choices)
 
 
+func offer_boss_relic() -> void:
+	if not run_active:
+		return
+	if overlay_open:
+		coins += 20
+		return
+	var choices := ContentDB.roll_relics(3)
+	if choices.is_empty():
+		offer_chest_cards()
+		return
+	card_source = "reliquia"
+	if debug_auto_upgrade:
+		apply_upgrade(choices[0])
+		return
+	AudioManager.play_sfx("levelup")
+	leveled.emit(choices)
+
+
 func end_run(victory: bool) -> void:
 	if not run_active:
 		return
+	update_contract_progress("time", int(run_time))
 	cancel_hitstop()
 	run_active = false
 	# Récords antes de registrar la run (para marcar "¡NUEVO RÉCORD!" en el resumen).
@@ -760,6 +1028,12 @@ func end_run(victory: bool) -> void:
 		"weapons": weapons.duplicate(),
 		"weapon_levels": weapon_levels.duplicate(),
 		"upgrade_counts": upgrade_counts.duplicate(),
+		"relics": relic_ids.duplicate(),
+		"contract": {
+			"id": contract_id,
+			"progress": contract_progress,
+			"completed": contract_is_complete,
+		},
 	}
 	# Smoke: valida logros en memoria pero no contamina el save real.
 	var new_ones: Array = SaveManager.register_run(

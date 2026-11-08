@@ -1,0 +1,34 @@
+[
+	{
+		"id": "cazador",
+		"name": "Cacería mayor",
+		"desc": "Elimina 120 enemigos durante la expedición.",
+		"stat": "kills",
+		"goal": 120,
+		"reward": 75
+	},
+	{
+		"id": "rompecoronas",
+		"name": "Rompecoronas",
+		"desc": "Derrota a un jefe.",
+		"stat": "bosses",
+		"goal": 1,
+		"reward": 110
+	},
+	{
+		"id": "superviviente",
+		"name": "Sin retroceder",
+		"desc": "Sobrevive durante 6 minutos.",
+		"stat": "time",
+		"goal": 360,
+		"reward": 90
+	},
+	{
+		"id": "coleccionista",
+		"name": "Coleccionista arcano",
+		"desc": "Consigue 2 reliquias de jefe.",
+		"stat": "relics",
+		"goal": 2,
+		"reward": 130
+	}
+]

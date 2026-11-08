@@ -358,6 +358,7 @@ func _kill(e: Enemy) -> void:
 	if e.boss:
 		boss_ref = null
 		GameState.bosses_killed += 1
+		GameState.update_contract_progress("bosses", GameState.bosses_killed)
 		GameState.hitstop(110)
 		var is_final := e.kind == "boss_final"
 		if GameState.debug_auto_upgrade:
@@ -367,7 +368,7 @@ func _kill(e: Enemy) -> void:
 		GameState.hp = minf(GameState.hp + GameState.max_hp * 0.3, GameState.max_hp)
 		GameState.hp_changed.emit(GameState.hp, GameState.max_hp)
 		AudioManager.play_sfx("levelup", 0.8)
-		GameState.offer_chest_cards()
+		GameState.offer_boss_relic()
 		return
 	var xp_val := e.xp_value * (4 if e.elite else 1)
 	GameState.add_kill(xp_val)
