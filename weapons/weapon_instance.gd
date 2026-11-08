@@ -4,6 +4,7 @@
 extends Node3D
 
 var weapon_id := ""
+var _def: Dictionary = {}
 var _t := 0.0
 var _hit_cd := {}   # instance_id del enemigo -> cooldown restante (para daño persistente)
 
@@ -43,14 +44,14 @@ func setup(id: String) -> void:
 
 
 func _ready() -> void:
-	var def: Dictionary = ContentDB.weapons.get(weapon_id, {})
-	match String(def.get("pattern", "")):
+	_def = ContentDB.weapons.get(weapon_id, {})
+	match String(_def.get("pattern", "")):
 		"orbit":
-			_spawn_blades(int(def.get("blades", 2)))
+			_spawn_blades(int(_def.get("blades", 2)))
 		"aura":
-			var col_arr: Array = def.get("color", [0.9, 0.4, 1.0]) if def.get("color", []) is Array else [0.9, 0.4, 1.0]
+			var col_arr: Array = _def.get("color", [0.9, 0.4, 1.0]) if _def.get("color", []) is Array else [0.9, 0.4, 1.0]
 			_aura_ring = _make_ring(
-				float(def.get("radius", 3.0)),
+				float(_def.get("radius", 3.0)),
 				Color(float(col_arr[0]), float(col_arr[1]), float(col_arr[2]))
 			)
 		"boomerang":
@@ -60,7 +61,7 @@ func _ready() -> void:
 		"chain":
 			_make_chain_lines(6)
 		"drone":
-			_spawn_drones(int(def.get("drones", 1)))
+			_spawn_drones(int(_def.get("drones", 1)))
 		"slam", "meteor", "void":
 			pass
 
@@ -68,9 +69,11 @@ func _ready() -> void:
 func _physics_process(dt: float) -> void:
 	if not GameState.run_active:
 		return
-	var def: Dictionary = ContentDB.weapons.get(weapon_id, {})
-	if def.is_empty():
-		return
+	if _def.is_empty():
+		_def = ContentDB.weapons.get(weapon_id, {})
+		if _def.is_empty():
+			return
+	var def: Dictionary = _def
 	match String(def.get("pattern", "")):
 		"nearest":
 			_fire_nearest(def, dt)
@@ -94,7 +97,7 @@ func _physics_process(dt: float) -> void:
 			_tick_drone(def, dt)
 		"void":
 			_tick_void(def, dt)
-	for key in _hit_cd.keys():
+	for key in _hit_cd:
 		_hit_cd[key] = maxf(float(_hit_cd[key]) - dt, 0.0)
 	# limpieza barata de cooldowns muertos
 	if Engine.get_physics_frames() % 60 == 0:

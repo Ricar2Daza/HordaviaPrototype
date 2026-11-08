@@ -9,6 +9,7 @@ var _pool: Array[Node3D] = []
 var _values: Array[float] = []
 var _alive: Array[int] = []
 var _free: Array[int] = []
+var _in_use := PackedByteArray()
 
 
 func _ready() -> void:
@@ -30,6 +31,7 @@ func _ready() -> void:
 		add_child(mi)
 		_pool.append(mi)
 		_values.append(0.0)
+	_in_use.resize(MAX_ORBS)
 	GameState.run_reset.connect(reset)
 	GameState.run_started.connect(reset)
 
@@ -47,11 +49,12 @@ func spawn_orb(pos: Vector3, value: int) -> void:
 		return
 	var gy := 0.4
 	if GameState.terrain != null:
-		gy = float(GameState.terrain.call("height_at", pos.x, pos.z)) + 0.4
+		gy = GameState.terrain.height_at(pos.x, pos.z) + 0.4
 	_pool[idx].position = Vector3(pos.x, gy, pos.z)
 	_pool[idx].visible = true
 	_values[idx] = float(maxi(value, 1))
-	if not _alive.has(idx):
+	if _in_use[idx] == 0:
+		_in_use[idx] = 1
 		_alive.append(idx)
 
 
@@ -72,13 +75,14 @@ func _physics_process(dt: float) -> void:
 			AudioManager.play_sfx("pickup", randf_range(0.95, 1.15))
 			_pool[idx].visible = false
 			_pool[idx].position = Vector3(0, -50, 0)
+			_in_use[idx] = 0
 			_free.append(idx)
 			_alive[i] = _alive[_alive.size() - 1]
 			_alive.remove_at(_alive.size() - 1)
 		elif d < magnet + 4.0:
 			orb.position += (d3 / maxf(d, 0.01)) * 22.0 * dt
 			if GameState.terrain != null:
-				orb.position.y = float(GameState.terrain.call("height_at", orb.position.x, orb.position.z)) + 0.4
+				orb.position.y = GameState.terrain.height_at(orb.position.x, orb.position.z) + 0.4
 			i += 1
 		else:
 			i += 1
@@ -87,6 +91,7 @@ func _physics_process(dt: float) -> void:
 func reset() -> void:
 	_alive.clear()
 	_free.clear()
+	_in_use.fill(0)
 	for orb in _pool:
 		orb.visible = false
 		orb.position = Vector3(0, -50, 0)

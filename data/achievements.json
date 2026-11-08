@@ -1,9 +1,18 @@
 [
-	{ "id": "first_blood", "name": "Primera sangre", "desc": "Elimina a tu primer enemigo", "stat": "total_kills", "goal": 1 },
-	{ "id": "slayer_500", "name": "Matarife", "desc": "500 bajas acumuladas", "stat": "total_kills", "goal": 500 },
-	{ "id": "slayer_2000", "name": "Exterminador", "desc": "2000 bajas acumuladas", "stat": "total_kills", "goal": 2000 },
-	{ "id": "boss_hunter", "name": "Cazador de jefes", "desc": "Derrota a un jefe", "stat": "boss_kills", "goal": 1 },
-	{ "id": "victor_1", "name": "Conquistador", "desc": "Gana una partida", "stat": "victories", "goal": 1 },
-	{ "id": "survivor_600", "name": "Superviviente", "desc": "Sobrevive 10 minutos en una partida", "stat": "best_time", "goal": 600 },
-	{ "id": "rich_1000", "name": "Ahorrador", "desc": "Acumula 1000 monedas ganadas", "stat": "coins_earned", "goal": 1000 }
+	{ "id": "first_blood", "name": "Primera sangre", "desc": "Elimina a tu primer enemigo", "stat": "total_kills", "goal": 1, "reward": 25 },
+	{ "id": "slayer_500", "name": "Matarife", "desc": "500 bajas acumuladas", "stat": "total_kills", "goal": 500, "reward": 100 },
+	{ "id": "slayer_2000", "name": "Exterminador", "desc": "2000 bajas acumuladas", "stat": "total_kills", "goal": 2000, "reward": 250 },
+	{ "id": "slayer_5000", "name": "Marea de ceniza", "desc": "5000 bajas acumuladas", "stat": "total_kills", "goal": 5000, "reward": 400 },
+	{ "id": "boss_hunter", "name": "Cazador de jefes", "desc": "Derrota a un jefe", "stat": "boss_kills", "goal": 1, "reward": 100 },
+	{ "id": "boss_10", "name": "Rompe-titanes", "desc": "Derrota a 10 jefes", "stat": "boss_kills", "goal": 10, "reward": 300 },
+	{ "id": "victor_1", "name": "Conquistador", "desc": "Gana una partida", "stat": "victories", "goal": 1, "reward": 200 },
+	{ "id": "survivor_600", "name": "Superviviente", "desc": "Sobrevive 10 minutos en una partida", "stat": "best_time", "goal": 600, "reward": 150 },
+	{ "id": "survivor_1200", "name": "Leyenda de niebla", "desc": "Sobrevive 20 minutos en una partida", "stat": "best_time", "goal": 1200, "reward": 300 },
+	{ "id": "rich_1000", "name": "Ahorrador", "desc": "Acumula 1000 monedas ganadas", "stat": "coins_earned", "goal": 1000, "reward": 150 },
+	{ "id": "rich_5000", "name": "Señor de la niebla", "desc": "Acumula 5000 monedas ganadas", "stat": "coins_earned", "goal": 5000, "reward": 350 },
+	{ "id": "runs_25", "name": "Veterano del ciclo", "desc": "Completa 25 expediciones", "stat": "runs_played", "goal": 25, "reward": 200 },
+	{ "id": "level_15", "name": "Ascendido", "desc": "Alcanza el nivel 15 en una partida", "stat": "best_level", "goal": 15, "reward": 200 },
+	{ "id": "kills_250", "name": "Segador de hordas", "desc": "250 bajas en una sola partida", "stat": "best_kills", "goal": 250, "reward": 150 },
+	{ "id": "damage_50k", "name": "Devastador", "desc": "Inflige 50.000 de daño en una partida", "stat": "best_damage", "goal": 50000, "reward": 250 },
+	{ "id": "cycle_1", "name": "Vuelta completa", "desc": "Sobrevive a un ciclo entero de 7 biomas", "stat": "best_loop", "goal": 1, "reward": 500 }
 ]

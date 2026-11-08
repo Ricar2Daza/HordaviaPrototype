@@ -7,10 +7,11 @@ const RISE_SPEED := 1.6
 const LIFE := 0.65
 
 var _pool: Array[Label3D] = []
-var _t := PackedFloat64Array()
+var _t := PackedFloat32Array()
 var _base := PackedVector3Array()
 var _alive: Array[int] = []
 var _free: Array[int] = []
+var _in_use := PackedByteArray()
 
 
 func _ready() -> void:
@@ -28,10 +29,14 @@ func _ready() -> void:
 		_pool.append(l)
 	_t.resize(MAX_NUMBERS)
 	_base.resize(MAX_NUMBERS)
+	_in_use.resize(MAX_NUMBERS)
 	GameState.run_reset.connect(reset)
 
 
 func spawn(pos: Vector3, dmg: float, big: bool = false) -> void:
+	# Accesibilidad: números de daño desactivables desde Ajustes.
+	if not GameState.show_damage:
+		return
 	var idx := -1
 	if not _free.is_empty():
 		idx = int(_free.pop_back())
@@ -44,16 +49,19 @@ func spawn(pos: Vector3, dmg: float, big: bool = false) -> void:
 	l.text = str(int(round(dmg)))
 	if big:
 		l.modulate = Color(1.0, 0.55, 0.2, 1.0)
-		l.font_size = 96
+		if l.font_size != 96:
+			l.font_size = 96
 	else:
 		l.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		l.font_size = 64
+		if l.font_size != 64:
+			l.font_size = 64
 	_base[idx] = pos + Vector3(randf_range(-0.25, 0.25), 1.5, randf_range(-0.25, 0.25))
 	l.position = _base[idx]
 	l.rotation = Vector3.ZERO
 	_t[idx] = 0.0
 	l.visible = true
-	if not _alive.has(idx):
+	if _in_use[idx] == 0:
+		_in_use[idx] = 1
 		_alive.append(idx)
 
 
@@ -67,6 +75,7 @@ func _process(dt: float) -> void:
 		var frac := float(_t[idx]) / LIFE
 		if frac >= 1.0:
 			_pool[idx].visible = false
+			_in_use[idx] = 0
 			_free.append(idx)
 			_alive[i] = _alive[_alive.size() - 1]
 			_alive.remove_at(_alive.size() - 1)
@@ -80,5 +89,6 @@ func _process(dt: float) -> void:
 func reset() -> void:
 	_alive.clear()
 	_free.clear()
+	_in_use.fill(0)
 	for l in _pool:
 		l.visible = false

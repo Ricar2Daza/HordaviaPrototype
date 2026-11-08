@@ -2,11 +2,13 @@
 ## (ralentizan). Se regeneran por bioma vía main._apply_biome().
 extends Node3D
 
-var terrain = null
+const TerrainField = preload("res://world/terrain.gd")
+
+var terrain: TerrainField = null
 var _zones: Array = []   # {node, pos, radius, kind}
 
 
-func setup(t) -> void:
+func setup(t: TerrainField) -> void:
 	terrain = t
 
 
@@ -21,7 +23,7 @@ func spawn_for_biome(b: Dictionary) -> void:
 		var ang := randf() * TAU
 		var dist := randf_range(8.0, 31.0)
 		var pos := Vector3(cos(ang) * dist, 0.0, sin(ang) * dist)
-		pos.y = float(terrain.call("height_at", pos.x, pos.z)) if terrain != null else 0.0
+		pos.y = terrain.height_at(pos.x, pos.z) if terrain != null else 0.0
 		var radius := randf_range(2.4, 4.2)
 		var mi := MeshInstance3D.new()
 		var cyl := CylinderMesh.new()

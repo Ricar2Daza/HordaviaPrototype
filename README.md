@@ -38,7 +38,7 @@ guía maestra, apéndice de sistemas, roadmap de features, celulares objetivo y 
 | §3.1 Joystick de un pulgar | ✅ flotante, con deadzone y knob dibujado |
 | §3.2 MultiMesh bullets | ✅ cap 1500, grilla espacial para impactos |
 | §3.3 Spawn Director JSON | ✅ budget/seg por minuto + eventos de círculo |
-| §3.4 Armas data-driven | ✅ 8 armas base + niveles I–VIII + 8 evoluciones |
+| §3.4 Armas data-driven | ✅ 12 armas base + niveles I–VIII + 8 evoluciones |
 | §3.5 XP + tarjetas de level-up | ✅ rareza ponderada + reroll/desterrar/saltar + pasiva suerte |
 | §3.6 Guardado FileAccess | ✅ monedas, meta, personaje, stats/logros y settings (v3) |
 | §3.7 Shader toon | ✅ 3 bandas + rim |
@@ -273,7 +273,7 @@ indicado, aparece una carta **legendaria de EVOLUCIÓN** (garantizada en el sort
 Hay 8 recetas en `data/evolutions.json` (100 % data-driven). Al evolucionar, el arma base
 **desaparece** y el nodo se reconstruye en caliente (`weapons` → `upgrades_changed`).
 
-## Fase 2.1 — arsenal (8 armas base, todas data-driven)
+## Fase 2.1 — arsenal (12 armas base, todas data-driven)
 
 | Carta de desbloqueo | Arma | Qué hace |
 |---|---|---|
@@ -285,6 +285,10 @@ Hay 8 recetas en `data/evolutions.json` (100 % data-driven). Al evolucionar, el 
 | Cadencia de tormenta | `chain` | Relámpago con 3 saltos entre enemigos (épica) |
 | Espiral de esquirlas | `spiral` | Abanico giratorio de 3 proyectiles que cubre 360° |
 | Escarcha rúnica | `frost` | Anillo helado que daña y ralentiza (×0.55 durante 1.2 s) |
+| Mazo sísmico | `hammer` | Onda de choque de área alrededor del jugador |
+| Meteoro rúnico | `meteor` | Invoca un meteoro sobre el enemigo más cercano |
+| Dron de niebla | `drone` | Dron orbitante que dispara al enemigo cercano |
+| Vacío devorador | `void` | Singularidad que atrae y daña a los enemigos |
 
 Armas **evolucionadas** (solo vía receta 2.2): `railgun`, `supernova`, `disc_tempest`,
 `earthbreaker`, `starfall`, `war_swarm`, `black_sun` y `thunderstorm`.
@@ -339,3 +343,15 @@ El APK Android debug se compiló y firmó con el mismo código.
    aplica sola (`debug_auto_upgrade`) tanto en `GameState.offer_chest_cards()` como en
    `HUD._on_leveled()`.
 
+
+
+## Nuevas features (build actual)
+
+- **Logros con recompensa**: 16 logros data-driven en `data/achievements.json`; cada uno paga monedas al desbloquearse (`reward`) y se acumula en `achievement_coins`. Nuevos records: mejor nivel, mas bajas, mas dano y ciclo maximo.
+- **Resumen de run mejorado**: el game over muestra dano infligido, jefes, ciclo, build de armas con niveles, pasivas y marcas de "NUEVO RECORD"; los logros nuevos aparecen con su recompensa.
+- **Accesibilidad (roadmap 1.6)**: ajustes persistentes de sacudida de camara (off/suave/normal), hitstop de impactos (on/off), numeros de dano (on/off) y tamano tactil (auto/S/M/L).
+- **Hitstop**: 40 ms al recibir dano, 35 ms al matar elites y 110 ms al matar jefes; se restaura con ticks reales y se omite en el smoke.
+- **Layout tactil adaptable (roadmap 5.5)**: joystick, botones, radio de acierto y tipografia escalan automaticamente por tamano de pantalla, con override manual en Ajustes.
+- **Guardado v4**: campos nuevos tolerantes a saves v3 (los valores ausentes usan defaults).
+
+Smoke validado (75 s): 0 errores de script, `SMOKE_FEATURES`, `SMOKE_ACH achievements=... rewards=...` y `SMOKE_RESULT`. UI de todas las pestanas del hub verificada en headless.

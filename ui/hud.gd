@@ -2,6 +2,8 @@
 ## Autoload CanvasLayer con PROCESS_MODE_ALWAYS para que la UI viva con el árbol pausado.
 extends CanvasLayer
 
+const HubMenu = preload("res://ui/hub_menu.gd")
+
 const RARITY_COLORS := {
 	"comun": Color(0.75, 0.75, 0.78),
 	"raro": Color(0.35, 0.55, 0.9),
@@ -44,7 +46,7 @@ var _paused_before_menu := false
 var _cam_btn: Button
 
 # Pantalla de inicio / hub clásico con submenús (roadmap 4.1–4.2)
-var _start_root: Control
+var _start_root: HubMenu
 var _hub_margin: MarginContainer
 var _hub_nav: HBoxContainer
 var _hub_nav_buttons := {}
@@ -56,6 +58,22 @@ var _hub_resume_btn: Button
 var _hub_tab := "jugar"
 var _hub_codex_sub := "armas"
 var _weather_label: Label
+
+# Cachés de UI: solo se reconstruyen textos cuando cambia el valor (evita
+# formatear strings y re-layout cada frame).
+var _ui_time := -1
+var _ui_kills := -1
+var _ui_level := -1
+var _ui_xp := -1
+var _ui_xp_needed := -1
+var _ui_coins := -1
+var _ui_weather := ""
+var _ui_biome := -1
+var _vig_a := 0.0
+var _biome_a := 0.0
+var _boss_text := ""
+var _boss_kind := ""
+var _boss_value := -1.0
 
 
 func _ready() -> void:
@@ -391,21 +409,38 @@ func _process(_dt: float) -> void:
 			and not _start_root.visible)
 	if GameState.run_active:
 		var t := int(GameState.run_time)
-		_time_label.text = "%d:%02d" % [t / 60, t % 60]
-		_kills_label.text = "Bajas: %d" % GameState.kills
-		_level_label.text = "Nivel %d  (XP %d/%d)" % [GameState.level, GameState.xp, GameState.xp_to_next(GameState.level)]
-		_coins_label.text = "Monedas: %d" % GameState.coins
-		_weather_label.text = "Clima: %s · Bioma %d/%d" % [
-			GameState.weather_name, GameState.biome_index + 1, maxi(ContentDB.biomes.size(), 1),
-		]
+		if t != _ui_time:
+			_ui_time = t
+			_time_label.text = "%d:%02d" % [t / 60, t % 60]
+		if GameState.kills != _ui_kills:
+			_ui_kills = GameState.kills
+			_kills_label.text = "Bajas: %d" % _ui_kills
+		if GameState.level != _ui_level or GameState.xp != _ui_xp:
+			_ui_level = GameState.level
+			_ui_xp = GameState.xp
+			_ui_xp_needed = GameState.xp_to_next(_ui_level)
+			_level_label.text = "Nivel %d  (XP %d/%d)" % [_ui_level, _ui_xp, _ui_xp_needed]
+		if GameState.coins != _ui_coins:
+			_ui_coins = GameState.coins
+			_coins_label.text = "Monedas: %d" % _ui_coins
+		if GameState.weather_name != _ui_weather or GameState.biome_index != _ui_biome:
+			_ui_weather = GameState.weather_name
+			_ui_biome = GameState.biome_index
+			_weather_label.text = "Clima: %s · Bioma %d/%d" % [
+				_ui_weather, _ui_biome + 1, maxi(ContentDB.biomes.size(), 1),
+			]
 		_weather_label.visible = true
 	else:
 		_weather_label.visible = false
 	# Banner de bioma: aparece 3 s al cambiar
 	if _biome_t > 0.0:
 		_biome_t = maxf(_biome_t - _dt, 0.0)
-		_biome_label.modulate.a = clampf(_biome_t / 0.8, 0.0, 1.0)
-	else:
+		var target_a := clampf(_biome_t / 0.8, 0.0, 1.0)
+		if absf(target_a - _biome_a) > 0.002:
+			_biome_a = target_a
+			_biome_label.modulate.a = target_a
+	elif _biome_a != 0.0:
+		_biome_a = 0.0
 		_biome_label.modulate.a = 0.0
 	# Fundido de transición de bioma (roadmap 3.2)
 	if _fade_t > 0.0:
@@ -419,16 +454,28 @@ func _process(_dt: float) -> void:
 	if GameState.run_active and GameState.hp_ratio() < 0.3:
 		pulse = 0.10 + 0.06 * absf(sin(Time.get_ticks_msec() * 0.006))
 	var a := maxf(_vig_flash, pulse)
-	_vig.color.a = a
+	if absf(a - _vig_a) > 0.002 or (a == 0.0 and _vig_a != 0.0):
+		_vig_a = a
+		_vig.color.a = a
 	# Barra del jefe: visible mientras haya un boss activo (roadmap 3.4)
 	var boss_alive: bool = EnemyManager.boss_active()
 	if boss_alive != _boss_bar.visible:
 		_boss_bar.visible = boss_alive
 		_boss_label.visible = boss_alive
+		if not boss_alive:
+			_boss_value = -1.0
+			_boss_kind = ""
 	if boss_alive:
-		_boss_bar.value = EnemyManager.boss_ref.hp / maxf(EnemyManager.boss_ref.max_hp, 1.0)
-		var def: Dictionary = ContentDB.enemies.get(String(EnemyManager.boss_ref.kind), {})
-		_boss_label.text = String(def.get("display", "JEFE")).to_upper()
+		var hp_frac: float = EnemyManager.boss_ref.hp / maxf(EnemyManager.boss_ref.max_hp, 1.0)
+		if absf(hp_frac - _boss_value) > 0.0005:
+			_boss_value = hp_frac
+			_boss_bar.value = hp_frac
+		var kind := String(EnemyManager.boss_ref.kind)
+		if kind != _boss_kind:
+			_boss_kind = kind
+			var e_def: Dictionary = ContentDB.enemies.get(kind, {})
+			_boss_text = String(e_def.get("display", "JEFE")).to_upper()
+			_boss_label.text = _boss_text
 
 
 # ---------------- Level-up ----------------
@@ -633,20 +680,18 @@ func _build_game_over() -> void:
 
 ## Hub clásico modular (Jugar / Personajes / Tienda / Maldiciones / Códice / Logros / Ajustes).
 func _build_start() -> void:
-	_start_root = Control.new()
-	_start_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_start_root = HubMenu.new()
 	_start_root.visible = false
-	_start_root.set_script(load("res://ui/hub_menu.gd"))
 	add_child(_start_root)
-	_start_root.connect("play_requested", _play)
-	_start_root.connect("resume_requested", _resume_run)
-	_start_root.connect("quit_requested", func() -> void: get_tree().quit())
-	_start_root.call("setup")
+	_start_root.play_requested.connect(_play)
+	_start_root.resume_requested.connect(_resume_run)
+	_start_root.quit_requested.connect(func() -> void: get_tree().quit())
+	_start_root.setup()
 
 
 func _refresh_start() -> void:
 	if _start_root != null:
-		_start_root.call("refresh")
+		_start_root.refresh()
 
 
 func _open_start(tab: String = "jugar") -> void:
@@ -655,8 +700,8 @@ func _open_start(tab: String = "jugar") -> void:
 	_menu_root.visible = false
 	_menu_open = false
 	_start_root.visible = true
-	_start_root.call("select_tab", tab)
-	_start_root.call("refresh")
+	_start_root.select_tab(tab)
+	_start_root.refresh()
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -684,9 +729,14 @@ func _on_achievements_unlocked(list: Array) -> void:
 	if list.is_empty():
 		return
 	var names: Array[String] = []
+	var reward := 0
 	for a in list:
-		names.append(String(a.get("name", "")))
-	_biome_label.text = "LOGRO: %s" % ", ".join(names)
+		var r := int(a.get("reward", 0))
+		reward += r
+		names.append("%s (+%d)" % [String(a.get("name", "")), r])
+	var shown := names.slice(0, 3)
+	var extra := "" if names.size() <= 3 else "  +%d más" % (names.size() - 3)
+	_biome_label.text = "LOGRO: %s%s   ◈ +%d" % [", ".join(shown), extra, reward]
 	_biome_t = 3.5
 	if _start_root.visible:
 		_refresh_start()
@@ -701,10 +751,67 @@ func _on_run_ended(result: Dictionary) -> void:
 	var mins := int(result["time"]) / 60
 	var secs := int(result["time"]) % 60
 	_over_title.text = "¡VICTORIA!" if bool(result["victory"]) else "GAME OVER"
-	_over_stats.text = "Tiempo: %d:%02d   Nivel: %d   Bajas: %d   Monedas: %d\nMejor tiempo: %d:%02d   Monedas totales: %d" % [
-		mins, secs, int(result["level"]), int(result["kills"]), int(result["coins"]),
+	var records: Dictionary = result.get("records", {})
+	var marks: Array[String] = []
+	if bool(records.get("time", false)):
+		marks.append("tiempo")
+	if bool(records.get("kills", false)):
+		marks.append("bajas")
+	if bool(records.get("level", false)):
+		marks.append("nivel")
+	if bool(records.get("damage", false)):
+		marks.append("daño")
+	if bool(records.get("loop", false)):
+		marks.append("ciclo")
+	var rec_line := ""
+	if not marks.is_empty():
+		rec_line = "\n¡NUEVO RÉCORD! %s" % ", ".join(marks)
+	var ach_line := ""
+	var new_ach: Array = result.get("achievements", [])
+	if not new_ach.is_empty():
+		var parts: Array[String] = []
+		var reward := 0
+		for a in new_ach:
+			reward += int(a.get("reward", 0))
+			parts.append(String(a.get("name", "")))
+		var shown := parts.slice(0, 3)
+		var extra := "" if parts.size() <= 3 else "  +%d más" % (parts.size() - 3)
+		ach_line = "\nLogros: %s%s   ◈ +%d" % [", ".join(shown), extra, reward]
+	_over_stats.text = (
+		"Tiempo: %d:%02d   Nivel: %d   Bajas: %d\n"
+		+ "Daño: %s   Jefes: %d   Ciclo: %d   Monedas: %d\n"
+		+ "Mejor tiempo: %d:%02d   Monedas totales: %d\n"
+		+ "%s%s%s"
+	) % [
+		mins, secs, int(result["level"]), int(result["kills"]),
+		_fmt_num(float(result.get("damage", 0.0))), int(result.get("bosses", 0)),
+		int(result.get("loop", 0)), int(result["coins"]),
 		int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60, SaveManager.total_coins,
+		_run_build(result), rec_line, ach_line,
 	]
+
+
+## Resumen del build de la run (armas + nivel + pasivas) para el game over.
+func _run_build(result: Dictionary) -> String:
+	var ids: Array = result.get("weapons", [])
+	if ids.is_empty():
+		return "Build: sin datos"
+	var levels: Dictionary = result.get("weapon_levels", {})
+	var parts: Array[String] = []
+	for id in ids:
+		var def: Dictionary = ContentDB.weapons.get(String(id), {})
+		parts.append("%s L%d" % [String(def.get("display", id)), int(levels.get(String(id), 1))])
+	var ups: Dictionary = result.get("upgrade_counts", {})
+	var passive_total := 0
+	for k in ups:
+		passive_total += int(ups[k])
+	return "Build: %s · %d pasivas" % [", ".join(parts), passive_total]
+
+
+func _fmt_num(v: float) -> String:
+	if absf(v - round(v)) < 0.01:
+		return str(int(round(v)))
+	return "%.1f" % v
 
 
 func _restart() -> void:

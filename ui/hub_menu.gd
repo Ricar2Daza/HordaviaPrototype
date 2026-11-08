@@ -27,6 +27,9 @@ const NAV_LABELS := {
 const FPS_OPTIONS := [[30, "30"], [60, "60"], [120, "120"], [0, "∞"]]
 const QUALITY_OPTIONS := [["auto", "Auto"], ["bajo", "Baja"], ["medio", "Media"], ["alto", "Alta"]]
 const CAMERA_OPTIONS := [["fija", "Fija"], ["mouse", "Mouse"]]
+const SHAKE_OPTIONS := [[0.0, "Off"], [0.5, "Suave"], [1.0, "Normal"]]
+const TOGGLE_OPTIONS := [[false, "Off"], [true, "On"]]
+const TOUCH_OPTIONS := [[0.0, "Auto"], [0.9, "S"], [1.0, "M"], [1.15, "L"]]
 
 var _tab := "jugar"
 var _codex_sub := "armas"
@@ -595,11 +598,18 @@ func _codex_bestiary() -> void:
 func _render_records() -> void:
 	var stats := _card(_content, 0.0, Color(0.22, 0.34, 0.44))
 	_label(stats, "HISTORIAL", 17, Color(0.74, 0.90, 1.0))
-	_label(stats, "Partidas: %d   ·   Victorias: %d   ·   Bajas: %d   ·   Jefes: %d\nMejor tiempo: %d:%02d   ·   Monedas ganadas: %d   ·   Monedas actuales: %d" % [
+	_label(stats, "Partidas: %d   ·   Victorias: %d   ·   Bajas: %d   ·   Jefes: %d" % [
 		SaveManager.runs_played, SaveManager.victories, SaveManager.total_kills, SaveManager.boss_kills,
-		int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60,
-		SaveManager.coins_earned, SaveManager.total_coins,
 	], 12, Color(1, 1, 1, 0.76))
+	_label(stats, "RÉCORDS DE UNA PARTIDA", 13, Color(1.0, 0.86, 0.52))
+	_label(stats, "Mejor tiempo %d:%02d   ·   Mejor nivel %d   ·   Ciclo máximo %d\nMás bajas %d   ·   Más daño %s   ·   Monedas por logros %d" % [
+		int(SaveManager.best_time) / 60, int(SaveManager.best_time) % 60,
+		SaveManager.best_level, SaveManager.best_loop,
+		SaveManager.best_kills, _format_num(SaveManager.best_damage), SaveManager.achievement_coins,
+	], 12, Color(1, 1, 1, 0.76))
+	_label(stats, "Monedas ganadas: %d   ·   Monedas actuales: %d" % [
+		SaveManager.coins_earned, SaveManager.total_coins,
+	], 12, Color(0.84, 0.92, 1.0, 0.72))
 	var unlocked := 0
 	for a in ContentDB.achievements:
 		if bool(SaveManager.achievements.get(String(a.get("id", "")), false)):
@@ -619,6 +629,9 @@ func _render_records() -> void:
 		var card := _card(grid, 300.0, Color(0.30, 0.72, 0.44) if got else Color(0.16, 0.22, 0.27))
 		_label(card, "%s %s" % ["✓" if got else "○", String(a.get("name", id))], 14, Color(0.62, 1.0, 0.72) if got else Color(1, 1, 1, 0.70))
 		_label(card, String(a.get("desc", "")), 11, Color(1, 1, 1, 0.56))
+		var reward := int(a.get("reward", 0))
+		if reward > 0:
+			_label(card, "Recompensa: ◈ %d%s" % [reward, "  (cobrada)" if got else ""], 10, Color(1.0, 0.84, 0.36, 0.86))
 		if not got and goal > 0.0:
 			_label(card, "Progreso: %s / %s" % [_format_num(minf(value, goal)), _format_num(goal)], 10, Color(0.76, 0.86, 1.0, 0.62))
 
@@ -641,6 +654,19 @@ func _render_settings() -> void:
 	_label(audio, "AUDIO", 17, Color(0.84, 0.74, 1.0))
 	_slider_row(audio, "Música", int(SaveManager.settings.get("music_vol", 70)), _set_music_volume)
 	_slider_row(audio, "Efectos", int(SaveManager.settings.get("sfx_vol", 85)), _set_sfx_volume)
+
+	# Accesibilidad (roadmap 1.6) + layout táctil adaptable (roadmap 5.5).
+	var acc := _card(_content, 0.0, Color(0.24, 0.34, 0.26))
+	_label(acc, "ACCESIBILIDAD Y TÁCTIL", 17, Color(0.80, 1.0, 0.84))
+	_label(acc, "Sacudida de cámara", 12, Color(1, 1, 1, 0.66))
+	_segmented(acc, SHAKE_OPTIONS, GameState.screen_shake, _set_shake)
+	_label(acc, "Hitstop en impactos (pausa breve al golpear)", 12, Color(1, 1, 1, 0.66))
+	_segmented(acc, TOGGLE_OPTIONS, GameState.hitstop_enabled, _set_hitstop)
+	_label(acc, "Números de daño flotantes", 12, Color(1, 1, 1, 0.66))
+	_segmented(acc, TOGGLE_OPTIONS, GameState.show_damage, _set_damage_numbers)
+	_label(acc, "Tamaño táctil del joystick y botones", 12, Color(1, 1, 1, 0.66))
+	_segmented(acc, TOUCH_OPTIONS, GameState.touch_scale, _set_touch_scale)
+	_label(acc, "Layout actual: %s" % JoystickLayer.layout_label(), 10, Color(0.70, 0.86, 1.0, 0.62))
 
 	var info := _card(_content, 0.0, Color(0.16, 0.22, 0.27))
 	_label(info, "CONTROLES", 15, Color(0.82, 1.0, 0.90))
@@ -725,6 +751,30 @@ func _set_camera(mode: String) -> void:
 	refresh()
 
 
+func _set_shake(v: float) -> void:
+	GameState.set_screen_shake(v)
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
+func _set_hitstop(v: bool) -> void:
+	GameState.set_hitstop_enabled(v)
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
+func _set_damage_numbers(v: bool) -> void:
+	GameState.set_show_damage(v)
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
+func _set_touch_scale(v: float) -> void:
+	GameState.set_touch_scale(v)
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
 func _set_music_volume(v: int) -> void:
 	AudioManager.set_music_volume(v)
 	SaveManager.save_settings({"music_vol": v})
@@ -805,5 +855,13 @@ func _stat_value(stat: String) -> float:
 			return float(SaveManager.coins_earned)
 		"runs_played":
 			return float(SaveManager.runs_played)
+		"best_level":
+			return float(SaveManager.best_level)
+		"best_kills":
+			return float(SaveManager.best_kills)
+		"best_damage":
+			return SaveManager.best_damage
+		"best_loop":
+			return float(SaveManager.best_loop)
 		_:
 			return 0.0

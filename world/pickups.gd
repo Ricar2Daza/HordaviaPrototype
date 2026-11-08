@@ -45,32 +45,35 @@ func spawn(kind: String, pos: Vector3) -> void:
 	mi.mesh = mesh
 	var gy := pos.y
 	if GameState.terrain != null:
-		gy = float(GameState.terrain.call("height_at", pos.x, pos.z))
+		gy = GameState.terrain.height_at(pos.x, pos.z)
 	mi.position = Vector3(pos.x, gy + 0.5, pos.z)
 	add_child(mi)
 	_items.append({"node": mi, "t": 0.0, "kind": kind, "base_y": gy + 0.5})
 
 
 func _physics_process(dt: float) -> void:
+	if _items.is_empty():
+		return
 	var p = EnemyManager.player
-	for it in _items.duplicate():
+	for i in range(_items.size() - 1, -1, -1):
+		var it: Dictionary = _items[i]
 		var node: MeshInstance3D = it["node"]
 		if not is_instance_valid(node):
-			_items.erase(it)
+			_items.remove_at(i)
 			continue
 		it["t"] = float(it["t"]) + dt
 		var bob := float(it["t"])
 		node.position.y = float(it["base_y"]) + 0.18 * sin(bob * 3.2)
 		node.rotation.y += dt * 2.0
 		if float(it["t"]) > LIFETIME:
-			_items.erase(it)
+			_items.remove_at(i)
 			node.queue_free()
 			continue
 		if p == null or not GameState.run_active:
 			continue
 		if node.position.distance_to(p.position) < PICK_RADIUS:
 			_apply(String(it["kind"]), node.position)
-			_items.erase(it)
+			_items.remove_at(i)
 			node.queue_free()
 
 

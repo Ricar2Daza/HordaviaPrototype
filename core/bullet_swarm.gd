@@ -110,10 +110,14 @@ func spawn(start: Vector3, dir: Vector3, speed: float, dmg: float, life: float, 
 
 
 func _flush_views() -> void:
-	for idx in _alive.size():
-		var b := _alive[idx]
-		_mm.set_instance_transform(b, Transform3D(Basis.IDENTITY, _pos[b]))
-	_mm.visible_instance_count = _max_used + 1
+	# Render compacto: escribe solo las balas vivas en los slots 0..n-1 y ajusta
+	# el recuento visible. Antes se dibujaban/actualizaban los 1500 slots del pool
+	# (y `_max_used + 1` podía superar `instance_count`, provocando errores por frame).
+	var n := _alive.size()
+	for r in n:
+		_mm.set_instance_transform(r, Transform3D(Basis.IDENTITY, _pos[_alive[r]]))
+	if _mm.visible_instance_count != n:
+		_mm.visible_instance_count = n
 
 
 func active_count() -> int:

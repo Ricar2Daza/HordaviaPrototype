@@ -3,6 +3,8 @@
 ## También expone niebla y un pulso de relámpago para tormentas.
 extends Node3D
 
+const TerrainField = preload("res://world/terrain.gd")
+
 signal flash
 
 const MAX_PARTICLES := 460
@@ -11,7 +13,7 @@ const FIELD := 30.0
 var _mm: MultiMesh
 var _mmi: MultiMeshInstance3D
 var _mat: StandardMaterial3D
-var _terrain = null
+var _terrain: TerrainField = null
 var _p: PackedVector3Array = PackedVector3Array()
 var _phase: PackedFloat32Array = PackedFloat32Array()
 var _kind := "clear"
@@ -24,7 +26,7 @@ var _next_flash := 0.0
 var _flash_t := 0.0
 
 
-func setup(t) -> void:
+func setup(t: TerrainField) -> void:
 	_terrain = t
 	_p.resize(MAX_PARTICLES)
 	_phase.resize(MAX_PARTICLES)
@@ -142,18 +144,21 @@ func _physics_process(dt: float) -> void:
 			flash.emit()
 			AudioManager.play_sfx("zap", 0.55)
 	var pscale := _particle_scale()
+	# Tiempo, terreno y altura de suelo se cachean fuera del bucle de partículas.
+	var tsec := float(Time.get_ticks_msec()) * 0.001
+	var terr := _terrain
 	for i in _active:
 		var pos := _p[i]
 		match _kind:
 			"rain", "storm":
-				pos += Vector3(_wind.x, _wind.y, _wind.z) * dt
+				pos += _wind * dt
 			"snow":
 				pos.y += _wind.y * dt
-				pos.x += (sin(Time.get_ticks_msec() * 0.001 + _phase[i]) * 1.2 + _wind.x) * dt
-				pos.z += cos(Time.get_ticks_msec() * 0.0013 + _phase[i]) * 0.5 * dt
+				pos.x += (sin(tsec + _phase[i]) * 1.2 + _wind.x) * dt
+				pos.z += cos(tsec * 1.3 + _phase[i]) * 0.5 * dt
 			"ash":
 				pos.y += _wind.y * dt
-				pos.x += (sin(Time.get_ticks_msec() * 0.0008 + _phase[i]) * 1.8 + _wind.x) * dt
+				pos.x += (sin(tsec * 0.8 + _phase[i]) * 1.8 + _wind.x) * dt
 				pos.z += _wind.z * dt
 			"sand":
 				pos.x += _wind.x * dt
@@ -161,14 +166,16 @@ func _physics_process(dt: float) -> void:
 				pos.z += _wind.z * dt
 			"embers":
 				pos.y += _wind.y * dt
-				pos.x += sin(Time.get_ticks_msec() * 0.0011 + _phase[i]) * 1.1 * dt
+				pos.x += sin(tsec * 1.1 + _phase[i]) * 1.1 * dt
 			"fog":
-				pos.x += sin(Time.get_ticks_msec() * 0.0006 + _phase[i]) * 0.7 * dt
-				pos.z += cos(Time.get_ticks_msec() * 0.0007 + _phase[i]) * 0.5 * dt
-		var floor_y := 0.0
-		if _terrain != null:
-			floor_y = float(_terrain.call("height_at", global_position.x + pos.x, global_position.z + pos.z)) + 0.15
+				pos.x += sin(tsec * 0.6 + _phase[i]) * 0.7 * dt
+				pos.z += cos(tsec * 0.7 + _phase[i]) * 0.5 * dt
 		var dead := false
+		# height_at() es caro: solo se consulta cuando la partícula está cerca del suelo.
+		var floor_y := 0.0
+		var ground_relevant := _kind != "embers" and (pos.y < 8.0 or _kind == "sand")
+		if ground_relevant and terr != null:
+			floor_y = terr.height_at(global_position.x + pos.x, global_position.z + pos.z) + 0.15
 		match _kind:
 			"rain", "storm", "snow", "ash":
 				dead = pos.y < floor_y
@@ -182,7 +189,12 @@ func _physics_process(dt: float) -> void:
 			if _kind == "sand":
 				pos = Vector3(-FIELD, randf_range(0.5, 8.0), randf_range(-FIELD, FIELD))
 			elif _kind == "embers":
-				pos = Vector3(randf_range(-FIELD, FIELD), floor_y + 0.2, randf_range(-FIELD, FIELD))
+				var nx := randf_range(-FIELD, FIELD)
+				var nz := randf_range(-FIELD, FIELD)
+				var fy := 0.2
+				if terr != null:
+					fy = terr.height_at(global_position.x + nx, global_position.z + nz) + 0.2
+				pos = Vector3(nx, fy, nz)
 			else:
 				pos = Vector3(randf_range(-FIELD, FIELD), randf_range(20.0, 28.0), randf_range(-FIELD, FIELD))
 		_p[i] = pos

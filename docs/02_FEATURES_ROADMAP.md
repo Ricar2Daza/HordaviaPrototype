@@ -24,7 +24,7 @@ Esfuerzo: S = horas, M = días, L = semana+.
 ## Fase 2 — Progresión completa en-run
 | # | Feature | Detalle | Esf. | Estado |
 |---|---------|---------|------|--------|
-| 2.1 | **8 armas base (data-driven)** | `orbit`, `aura`, `boomerang`, `mine`, `chain`, `spiral` y `frost`, además del bastón inicial | M | ✅ |
+| 2.1 | **12 armas base (data-driven)** | `orbit`, `aura`, `boomerang`, `mine`, `chain`, `spiral`, `frost`, `hammer`, `meteor`, `drone`, `void` y el bastón inicial | M | ✅ |
 | 2.2 | **Evoluciones de armas** | 8 recetas `data/evolutions.json` (arma L8 + pasiva N → evolucionada); carta legendaria garantizada | M | ✅ |
 | 2.3 | **Reroll / banish / skip** | Pie de cartas: reroll 1/run, desterrar 1/run (fuera del pool toda la run), saltar +15 XP | S | ✅ |
 | 2.4 | **Pasiva luck** | `luck_1` ×1.3 peso de rarezas no comunes por stack (máx 5) | S | ✅ |
@@ -79,3 +79,10 @@ Esfuerzo: S = horas, M = días, L = semana+.
 - Retención día 1 > 35 % en softlaunch.
 - Crashes ANR < 1 % de sesiones.
 - Sesión media 8–12 min (una run completa 12–15 min) y 2+ sesiones/día.
+
+
+## Actualizacion (build actual)
+
+- **1.6 Screen shake + hitstop: COMPLETO**. Shake escalable (off/suave/normal), hitstop de 40 ms al recibir dano, 35 ms al matar elites y 110 ms al matar jefes.
+- **5.5 Botones tactiles: COMPLETO**. Layout adaptable automatico por tamano de pantalla y override manual S/M/L desde Ajustes. Falta verificacion fisica en 3 dispositivos.
+- **Extras**: logros con recompensa en monedas, records ampliados (nivel/bajas/dano/ciclo), resumen de build en el game over y guardado v4 compatible con v3.

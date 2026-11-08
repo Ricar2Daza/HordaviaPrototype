@@ -2,6 +2,8 @@
 ## Nodo simple (sin física de colisión): daño por contacto se resuelve en EnemyManager.
 extends Node3D
 
+const WeaponInstance = preload("res://weapons/weapon_instance.gd")
+
 const ARENA := 35.5
 
 # Salto/dash (roadmap 1.1): coyote 0.12 s, dash 0.22 s + i-frames, cooldown 3 s
@@ -53,7 +55,7 @@ func _on_reset() -> void:
 
 func _terrain_h() -> float:
 	if GameState.terrain != null:
-		return float(GameState.terrain.call("height_at", position.x, position.z))
+		return GameState.terrain.height_at(position.x, position.z)
 	return 0.0
 
 
@@ -110,9 +112,10 @@ func _physics_process(delta: float) -> void:
 		if Input.is_physical_key_pressed(KEY_D): v.x += 1
 		if Input.is_physical_key_pressed(KEY_W): v.y -= 1
 		if Input.is_physical_key_pressed(KEY_S): v.y += 1
-	if Input.is_physical_key_pressed(KEY_SPACE) and not _space_prev:
+	var space := Input.is_physical_key_pressed(KEY_SPACE)
+	if space and not _space_prev:
 		jump()
-	_space_prev = Input.is_physical_key_pressed(KEY_SPACE)
+	_space_prev = space
 	var dir := _input_dir(v)
 	if dir.length() > 1.0:
 		dir = dir.normalized()
@@ -183,8 +186,7 @@ func _rebuild_weapons() -> void:
 		existing[String(c.get_meta("wid", ""))] = true
 	for id in GameState.weapons:
 		if not existing.has(id):
-			var w := Node3D.new()
-			w.set_script(load("res://weapons/weapon_instance.gd"))
+			var w := WeaponInstance.new()
 			w.set_meta("wid", id)
 			w.setup(id)          # antes de add_child: _ready() necesita weapon_id
 			_weapons_holder.add_child(w)

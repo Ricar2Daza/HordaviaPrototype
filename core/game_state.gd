@@ -2,6 +2,8 @@
 ## Autoload. Señales para HUD; todo el gameplay lee stats desde aquí.
 extends Node
 
+const TerrainField = preload("res://world/terrain.gd")
+
 signal xp_changed(xp: int, needed: int)
 signal leveled(choices: Array)
 signal hp_changed(hp: float, max_hp: float)
@@ -14,7 +16,7 @@ signal setting_changed
 signal kill_event(pos: Vector3, elite: bool)
 
 # --- Referencias globales de escena (registradas por world/Main) ---
-var terrain = null                # mundo procedural con height_at(x, z) (world/terrain.gd)
+var terrain: TerrainField = null  # mundo procedural con height_at(x, z) (world/terrain.gd)
 var cam_ref: Camera3D = null
 var arena_radius := 35.5          # radio jugable del mapa ampliado
 var biome_name := ""              # bioma activo para HUD/hub
@@ -48,6 +50,14 @@ var crit_dmg := 2.0               # multiplicador de crítico
 var execute_bonus := 0.0          # daño extra a enemigos heridos
 var chill_chance := 0.0           # probabilidad de ralentizar al golpear
 var proj_speed_mult := 1.0        # velocidad de proyectiles
+# --- Récords de la run y accesibilidad ---
+var damage_dealt := 0.0           # daño total infligido en la run (récord/resumen)
+var screen_shake := 1.0           # 0 = off, 0.5 = suave, 1 = normal (persistente)
+var hitstop_enabled := true       # congelación breve en impactos (persistente)
+var show_damage := true           # números de daño flotantes (persistente)
+var touch_scale := 0.0            # 0 = automático; 0.9/1.0/1.15 = override táctil
+var _hitstop_until := 0           # ticks reales en los que termina el hitstop
+var _smoke_features_done := false
 # --- Presupuestos por dispositivo (roadmap 5.1) ---
 var device_tier := "medio"
 var hardware_tier := "medio"       # tier detectado por RAM/GPU (inmutable)
@@ -64,6 +74,36 @@ var camera_far := 100.0           # distancia de dibujado
 func set_camera_mode(m: String) -> void:
 	camera_mode = m
 	SaveManager.save_settings({"camera_mode": m})
+	setting_changed.emit()
+
+
+# --- Accesibilidad (persistente) ---
+func set_screen_shake(v: float) -> void:
+	screen_shake = clampf(v, 0.0, 1.0)
+	SaveManager.save_settings({"shake": screen_shake})
+	setting_changed.emit()
+
+
+func set_hitstop_enabled(v: bool) -> void:
+	hitstop_enabled = v
+	if not v:
+		cancel_hitstop()
+	SaveManager.save_settings({"hitstop": v})
+	setting_changed.emit()
+
+
+func set_show_damage(v: bool) -> void:
+	show_damage = v
+	SaveManager.save_settings({"damage_numbers": v})
+	setting_changed.emit()
+
+
+## 0 = automático por tamaño de pantalla; 0.9/1.0/1.15 = override manual.
+func set_touch_scale(v: float) -> void:
+	touch_scale = v if [0.0, 0.9, 1.0, 1.15].has(v) else 0.0
+	SaveManager.save_settings({"touch_scale": touch_scale})
+	if JoystickLayer != null:
+		JoystickLayer.refresh_layout()
 	setting_changed.emit()
 
 
@@ -160,10 +200,14 @@ func _end_smoke() -> void:
 		int(run_time), kills, level, xp, BulletSwarm.active_count(), EnemyManager.active_count(),
 		int(SaveManager.best_time), SaveManager.total_coins,
 	])
+	SaveManager.smoke_achievement_check()
 	get_tree().quit()
 
 
 func _process(delta: float) -> void:
+	# Hitstop (roadmap 1.6): usa ticks reales para restaurar aunque time_scale sea bajo.
+	if _hitstop_until > 0 and Time.get_ticks_msec() >= _hitstop_until:
+		cancel_hitstop()
 	# Diagnóstico temporal del smoke: pulso cada 2 s de juego con fps y contadores
 	if debug_auto_upgrade and run_active and not get_tree().paused:
 		_probe_t -= delta
@@ -256,6 +300,14 @@ func _process(delta: float) -> void:
 		print("SMOKE_DISPLAY fps=%d quality=%s bullets=%d enemies=%d scale=%.2f" % [
 			fps_limit, quality_mode, max_bullets, enemy_cap, render_scale,
 		])
+	# Smoke: valida récords, accesibilidad y layout táctil (nuevas features).
+	if debug_auto_upgrade and run_active and not get_tree().paused and not _smoke_features_done and run_time > 72.0:
+		_smoke_features_done = true
+		print("SMOKE_FEATURES damage=%d best_level=%d best_kills=%d shake=%.2f hitstop=%s dmg_num=%s touch=%.2f layout=%s" % [
+			int(damage_dealt), SaveManager.best_level, SaveManager.best_kills,
+			screen_shake, str(hitstop_enabled), str(show_damage), touch_scale,
+			JoystickLayer.layout_label(),
+		])
 	if run_active and not get_tree().paused:
 		run_time += delta
 		if debug_auto_upgrade and run_time > 75.0:
@@ -304,7 +356,18 @@ func apply_saved_display() -> void:
 		_apply_tier(quality_mode)
 	else:
 		_apply_tier(hardware_tier)
-	print("DISPLAY fps=%d quality=%s tier=%s" % [fps_limit, quality_mode, device_tier])
+	# Accesibilidad (persistente): sacudida, hitstop, números y tamaño táctil.
+	screen_shake = clampf(float(SaveManager.settings.get("shake", 1.0)), 0.0, 1.0)
+	hitstop_enabled = bool(SaveManager.settings.get("hitstop", true))
+	show_damage = bool(SaveManager.settings.get("damage_numbers", true))
+	touch_scale = float(SaveManager.settings.get("touch_scale", 0.0))
+	if not [0.0, 0.9, 1.0, 1.15].has(touch_scale):
+		touch_scale = 0.0
+	if JoystickLayer != null:
+		JoystickLayer.refresh_layout()
+	print("DISPLAY fps=%d quality=%s tier=%s shake=%.2f hitstop=%s touch=%.2f" % [
+		fps_limit, quality_mode, device_tier, screen_shake, str(hitstop_enabled), touch_scale,
+	])
 	var mn := get_tree().get_first_node_in_group("main")
 	if mn != null:
 		if mn.has_method("apply_quality_live"):
@@ -440,6 +503,9 @@ func start_run() -> void:
 	_smoke_powers_done = false
 	_smoke_definitive_done = false
 	_smoke_display_done = false
+	_smoke_features_done = false
+	damage_dealt = 0.0
+	cancel_hitstop()
 	rerolls = 1
 	banishes = 1
 	banished = []
@@ -605,6 +671,24 @@ func take_damage(d: float) -> void:
 	hp_changed.emit(hp, max_hp)
 	if hp <= 0.0:
 		end_run(false)
+	else:
+		hitstop(40)
+
+
+## Game feel (roadmap 1.6): congela brevemente el tiempo en impactos fuertes.
+## Usa ticks reales para restaurar incluso con `Engine.time_scale` muy bajo.
+func hitstop(ms: int) -> void:
+	if not hitstop_enabled or debug_auto_upgrade or ms <= 0:
+		return
+	if not run_active or get_tree().paused:
+		return
+	_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + ms)
+	Engine.time_scale = 0.05
+
+
+func cancel_hitstop() -> void:
+	_hitstop_until = 0
+	Engine.time_scale = 1.0
 
 
 ## Daño continuo de hazards (roadmap 3.3): ignora el grace de contacto y no
@@ -653,19 +737,36 @@ func offer_chest_cards() -> void:
 func end_run(victory: bool) -> void:
 	if not run_active:
 		return
+	cancel_hitstop()
 	run_active = false
+	# Récords antes de registrar la run (para marcar "¡NUEVO RÉCORD!" en el resumen).
+	var records := {
+		"time": run_time > SaveManager.best_time + 0.01,
+		"kills": kills > SaveManager.best_kills,
+		"level": level > SaveManager.best_level,
+		"damage": damage_dealt > SaveManager.best_damage + 0.01,
+		"loop": endless_loop > SaveManager.best_loop,
+	}
 	last_result = {
 		"victory": victory,
 		"time": run_time,
 		"level": level,
 		"kills": kills,
 		"coins": coins,
+		"damage": damage_dealt,
+		"bosses": bosses_killed,
+		"loop": endless_loop,
+		"records": records,
+		"weapons": weapons.duplicate(),
+		"weapon_levels": weapon_levels.duplicate(),
+		"upgrade_counts": upgrade_counts.duplicate(),
 	}
-	if not debug_auto_upgrade:
-		SaveManager.register_run(coins, run_time, kills, victory, bosses_killed)
-	else:
-		# Smoke: valida logros en memoria pero no contamina el save real
-		SaveManager.register_run(coins, run_time, kills, victory, bosses_killed, false)
+	# Smoke: valida logros en memoria pero no contamina el save real.
+	var new_ones: Array = SaveManager.register_run(
+		coins, run_time, kills, victory, bosses_killed,
+		not debug_auto_upgrade, level, damage_dealt, endless_loop
+	)
+	last_result["achievements"] = new_ones
 	AudioManager.play_sfx("gameover" if not victory else "levelup")
 	get_tree().paused = true
 	run_ended.emit(last_result)

@@ -9,8 +9,11 @@ var player: Node3D = null
 var boss_ref = null                # jefe activo actual (roadmap 3.4) o null
 
 var _pools := {}                 # kind -> Array[Enemy]
+var _free_pool := {}             # kind -> Array[Enemy] libres (spawn O(1))
 var _active: Array[Enemy] = []
+var _active_pos := {}            # instance_id -> índice en _active (baja O(1))
 var _grid := {}                  # cell_key -> Array[Enemy]
+var _grid_keys: Array = []       # celdas usadas en el último build (se reutilizan)
 
 
 class Enemy extends Node3D:
@@ -63,6 +66,20 @@ func ensure_pool(kind: String, size: int) -> void:
 	if def.is_empty():
 		push_error("EnemyManager: tipo desconocido '%s'" % kind)
 		return
+	if bool(def.get("boss", false)):
+		size = mini(size, 2)   # solo hay un jefe activo por bioma
+	var radius := float(def.get("radius", 0.45))
+	var col_arr: Array = def.get("color", [0.6, 0.7, 0.4])
+	var base_color := Color(float(col_arr[0]), float(col_arr[1]), float(col_arr[2]))
+	# Malla y material compartidos por tipo: antes cada enemigo del pool creaba
+	# su propio CapsuleMesh + ShaderMaterial (60 materiales por tipo).
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 4.0 + 0.4
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://fx/toon.gdshader")
+	mat.set_shader_parameter("base_color", base_color)
+	mesh.material = mat
 	var arr: Array = []
 	for i in size:
 		var e := Enemy.new()
@@ -73,7 +90,7 @@ func ensure_pool(kind: String, size: int) -> void:
 		e.speed = float(def.get("speed", 3))
 		e.base_dmg = float(def.get("dmg", 5))
 		e.dmg = e.base_dmg
-		e.radius = float(def.get("radius", 0.45))
+		e.radius = radius
 		e.explode_radius = float(def.get("explode_radius", 0.0))
 		e.explode_dmg = float(def.get("explode_dmg", 0.0))
 		e.summon_kind = String(def.get("summon", ""))
@@ -81,9 +98,8 @@ func ensure_pool(kind: String, size: int) -> void:
 		e.summon_hp = float(def.get("summon_hp", 1.0))
 		e.summon_interval = float(def.get("summon_interval", 0.0))
 		e.xp_value = int(def.get("xp", 1))
-		var col_arr: Array = def.get("color", [0.6, 0.7, 0.4])
-		e.base_color = Color(col_arr[0], col_arr[1], col_arr[2])
-		e.visual = _make_visual(e.base_color, e.radius)
+		e.base_color = base_color
+		e.visual = _make_visual(mesh, radius)
 		e.add_child(e.visual)
 		if bool(def.get("boss", false)):
 			e.boss = true
@@ -111,38 +127,27 @@ func ensure_pool(kind: String, size: int) -> void:
 			e.visual.add_child(disc)
 			e.tele_disc = disc
 		e.visible = false
-		e.set_meta("hit_cd", {})
 		add_child(e)
 		arr.append(e)
 	_pools[kind] = arr
+	_free_pool[kind] = arr.duplicate()
 
 
-func _make_visual(c: Color, radius: float) -> Node3D:
+func _make_visual(mesh: CapsuleMesh, radius: float) -> Node3D:
 	var root := Node3D.new()
 	var mi := MeshInstance3D.new()
-	var mesh := CapsuleMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 4.0 + 0.4
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://fx/toon.gdshader")
-	mat.set_shader_parameter("base_color", c)
-	mesh.material = mat
 	mi.mesh = mesh
-	mi.position.y = mesh.height * 0.5 - mesh.radius * 0.5
+	mi.position.y = mesh.height * 0.5 - radius * 0.5
 	root.add_child(mi)
 	return root
 
 
 func spawn(kind: String, pos: Vector3, hp_mult: float = 1.0, elite: bool = false) -> void:
 	ensure_pool(kind, 60)
-	var arr: Array = _pools.get(kind, [])
-	var e = null
-	for cand in arr:
-		if not cand.visible:
-			e = cand
-			break
-	if e == null:
+	var free = _free_pool.get(kind)
+	if free == null or free.is_empty():
 		return  # presupuesto alcanzado: se ignora el spawn
+	var e: Enemy = free.pop_back()
 	e.visible = true
 	e.elite = elite
 	e.dmg = e.base_dmg * GameState.run_dmg_scale
@@ -156,8 +161,9 @@ func spawn(kind: String, pos: Vector3, hp_mult: float = 1.0, elite: bool = false
 		e.scale = Vector3.ONE
 	e.hp = e.max_hp
 	var gy := 0.0
-	if GameState.terrain != null:
-		gy = float(GameState.terrain.call("height_at", pos.x, pos.z))
+	var terr := GameState.terrain
+	if terr != null:
+		gy = terr.height_at(pos.x, pos.z)
 	e.position = Vector3(pos.x, gy, pos.z)
 	e.attack_cd = 0.0
 	e.bob_t = randf() * TAU
@@ -166,11 +172,11 @@ func spawn(kind: String, pos: Vector3, hp_mult: float = 1.0, elite: bool = false
 	e.tele_t = -1.0
 	e.charge_t = -1.0
 	e.hit_flash = 0.0
+	e.visual.scale = Vector3.ONE
 	if e.tele_disc != null:
 		((e.tele_disc.mesh as CylinderMesh).material as StandardMaterial3D).albedo_color.a = 0.0
 		e.tele_disc.visible = false
-	(e.get_meta("hit_cd") as Dictionary).clear()
-	_active.append(e)
+	_add_active(e)
 	if e.boss:
 		boss_ref = e
 
@@ -187,6 +193,7 @@ func _physics_process(dt: float) -> void:
 		return
 	_build_grid()
 	var ppos := player.position
+	var terr := GameState.terrain
 	var doomed: Array[Enemy] = []
 	var summons: Array = []
 	for e in _active:
@@ -222,8 +229,8 @@ func _physics_process(dt: float) -> void:
 		e.position.x = clampf(e.position.x, -ARENA, ARENA)
 		e.position.z = clampf(e.position.z, -ARENA, ARENA)
 		# seguir el relieve procedural
-		if GameState.terrain != null:
-			e.position.y = float(GameState.terrain.call("height_at", e.position.x, e.position.z))
+		if terr != null:
+			e.position.y = terr.height_at(e.position.x, e.position.z)
 		e.bob_t += dt * e.speed * 1.5
 		e.visual.position.y = absf(sin(e.bob_t)) * 0.15
 		if e.hit_flash > 0.0:
@@ -336,7 +343,10 @@ func _kill(e: Enemy) -> void:
 	var pos := e.position
 	e.visible = false
 	e.position = Vector3(0, -50, 0)
-	_active.erase(e)
+	_remove_active(e)
+	var free = _free_pool.get(e.kind)
+	if free != null:
+		free.append(e)
 	DeathFx.spawn(pos, e.base_color, e.elite or e.boss)
 	if e.explode_radius > 0.0:
 		# Bomber: estalla al morir (telegrafiado por su color naranja)
@@ -348,6 +358,7 @@ func _kill(e: Enemy) -> void:
 	if e.boss:
 		boss_ref = null
 		GameState.bosses_killed += 1
+		GameState.hitstop(110)
 		var is_final := e.kind == "boss_final"
 		if GameState.debug_auto_upgrade:
 			print("SMOKE_BOSS killed kind=%s final=%s" % [e.kind, str(is_final)])
@@ -360,6 +371,8 @@ func _kill(e: Enemy) -> void:
 		return
 	var xp_val := e.xp_value * (4 if e.elite else 1)
 	GameState.add_kill(xp_val)
+	if e.elite:
+		GameState.hitstop(35)
 	XPManager.spawn_orb(pos, xp_val)
 	GameState.kill_event.emit(pos, e.elite)
 
@@ -380,6 +393,7 @@ func damage(e: Enemy, dmg: float) -> void:
 	if GameState.chill_chance > 0.0 and randf() < GameState.chill_chance:
 		e.slow_t = maxf(e.slow_t, 1.4)
 		e.slow_mult = minf(e.slow_mult, 0.65)
+	GameState.damage_dealt += final_dmg
 	e.hp -= final_dmg
 	e.hit_flash = 0.06
 	FloatingNumbers.spawn(e.position + Vector3(0.0, e.radius * 2.0 + 0.6, 0.0), final_dmg, e.elite or crit)
@@ -399,15 +413,41 @@ func _cell_key(x: float, z: float) -> int:
 	return int(floor(x / CELL)) * 4093 + int(floor(z / CELL))
 
 
+func _add_active(e: Enemy) -> void:
+	_active_pos[e.get_instance_id()] = _active.size()
+	_active.append(e)
+
+
+## Baja O(1): intercambia con el último en vez de desplazar todo el array.
+func _remove_active(e: Enemy) -> void:
+	var id := e.get_instance_id()
+	var idx = _active_pos.get(id)
+	if idx == null:
+		return
+	var last: Enemy = _active[_active.size() - 1]
+	_active[idx] = last
+	_active_pos[last.get_instance_id()] = idx
+	_active.pop_back()
+	_active_pos.erase(id)
+
+
+## Reutiliza los arrays de celda entre ticks: antes se creaba uno nuevo por celda
+## con enemigos, 30 veces por segundo (churn de allocator en móvil).
 func _build_grid() -> void:
-	_grid.clear()
+	for key in _grid_keys:
+		(_grid[key] as Array).clear()
+	_grid_keys.clear()
 	for e in _active:
 		if not is_instance_valid(e) or not e.visible:
 			continue
 		var key := _cell_key(e.position.x, e.position.z)
-		if not _grid.has(key):
-			_grid[key] = []
-		(_grid[key] as Array).append(e)
+		var arr = _grid.get(key)
+		if arr == null:
+			arr = []
+			_grid[key] = arr
+		if arr.is_empty():
+			_grid_keys.append(key)
+		arr.append(e)
 
 
 func _separation(e: Enemy) -> Vector3:
@@ -416,7 +456,9 @@ func _separation(e: Enemy) -> Vector3:
 	var cz := int(floor(e.position.z / CELL))
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			var arr: Array = _grid.get((cx + dx) * 4093 + (cz + dz), [])
+			var arr = _grid.get((cx + dx) * 4093 + (cz + dz))
+			if arr == null:
+				continue
 			for o in arr:
 				if o == e:
 					continue
@@ -437,7 +479,9 @@ func hit_query(pos: Vector3, radius: float, dmg: float) -> bool:
 	var cz := int(floor(pos.z / CELL))
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			var arr: Array = _grid.get((cx + dx) * 4093 + (cz + dz), [])
+			var arr = _grid.get((cx + dx) * 4093 + (cz + dz))
+			if arr == null:
+				continue
 			for o in arr:
 				if not o.visible:
 					continue
@@ -474,7 +518,9 @@ func hit_sweep(prev: Vector3, cur: Vector3, radius: float, dmg: float) -> bool:
 	var seg2 := seg.dot(seg)
 	for gx in range(cx0, cx1 + 1):
 		for gz in range(cz0, cz1 + 1):
-			var arr: Array = _grid.get(gx * 4093 + gz, [])
+			var arr = _grid.get(gx * 4093 + gz)
+			if arr == null:
+				continue
 			for o in arr:
 				if not o.visible:
 					continue
@@ -523,7 +569,9 @@ func hit_sweep_ex(prev: Vector3, cur: Vector3, radius: float, dmg: float, ignore
 	var seg2 := seg.dot(seg)
 	for gx in range(cx0, cx1 + 1):
 		for gz in range(cz0, cz1 + 1):
-			var arr: Array = _grid.get(gx * 4093 + gz, [])
+			var arr = _grid.get(gx * 4093 + gz)
+			if arr == null:
+				continue
 			for o in arr:
 				if not o.visible or ignore.has(o.get_instance_id()):
 					continue
@@ -555,7 +603,9 @@ func enemies_in_radius(pos: Vector3, radius: float) -> Array:
 	var cz1 := int(floor((pos.z + radius) / CELL))
 	for gx in range(cx0, cx1 + 1):
 		for gz in range(cz0, cz1 + 1):
-			var arr: Array = _grid.get(gx * 4093 + gz, [])
+			var arr = _grid.get(gx * 4093 + gz)
+			if arr == null:
+				continue
 			for o in arr:
 				if not o.visible:
 					continue
@@ -568,9 +618,32 @@ func enemies_in_radius(pos: Vector3, radius: float) -> Array:
 
 ## Enemigo más cercano a pos dentro del radio (para auto-aim), sin dañar.
 ## `excluded` = diccionario de instancia_id -> true, para cadenas que no repiten blanco.
+## Radios cortos (cuchillas, cadena, mazo) usan la grilla en vez de recorrer toda
+## la horda; los radios largos (auto-aim) siguen con el barrido lineal, que es más
+## barato que abrir cientos de celdas.
 func nearest(pos: Vector3, radius: float, excluded: Dictionary = {}):
 	var best = null
 	var best_d := radius
+	if radius <= 12.0:
+		var cx0 := int(floor((pos.x - radius) / CELL)) - 1
+		var cx1 := int(floor((pos.x + radius) / CELL)) + 1
+		var cz0 := int(floor((pos.z - radius) / CELL)) - 1
+		var cz1 := int(floor((pos.z + radius) / CELL)) + 1
+		for gx in range(cx0, cx1 + 1):
+			for gz in range(cz0, cz1 + 1):
+				var arr = _grid.get(gx * 4093 + gz)
+				if arr == null:
+					continue
+				for e in arr:
+					if not e.visible or excluded.has(e.get_instance_id()):
+						continue
+					var dx: float = e.position.x - pos.x
+					var dz: float = e.position.z - pos.z
+					var d := sqrt(dx * dx + dz * dz)
+					if d < best_d:
+						best_d = d
+						best = e
+		return best
 	for e in _active:
 		if not e.visible:
 			continue
@@ -585,11 +658,8 @@ func nearest(pos: Vector3, radius: float, excluded: Dictionary = {}):
 
 
 func active_count() -> int:
-	var n := 0
-	for e in _active:
-		if e.visible:
-			n += 1
-	return n
+	# _active solo contiene enemigos vivos (se da de baja O(1) en _kill).
+	return _active.size()
 
 
 func _respawn_edge(ppos: Vector3) -> Vector3:
@@ -599,9 +669,17 @@ func _respawn_edge(ppos: Vector3) -> Vector3:
 
 func reset() -> void:
 	_active.clear()
+	_active_pos.clear()
 	_grid.clear()
+	_grid_keys.clear()
 	boss_ref = null
 	for kind in _pools:
-		for e in ( _pools[kind] as Array):
+		var free = _free_pool.get(kind)
+		if free == null:
+			free = []
+			_free_pool[kind] = free
+		free.clear()
+		for e in (_pools[kind] as Array):
 			e.visible = false
 			e.position = Vector3(0, -50, 0)
+			free.append(e)

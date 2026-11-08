@@ -11,6 +11,7 @@ var _next_elite_t := 90.0   # segundos de run del próximo élite
 var _biome_idx := -1
 var _boss_spawned := false
 var _last_loop := -1
+var _event_cache := {}   # biome id -> [{ev, key}] para no reconstruir strings cada tick
 const BIOME_MINUTES := 6.0   # duración de cada bioma antes de repetir el ciclo
 
 
@@ -82,20 +83,22 @@ func _physics_process(dt: float) -> void:
 			GameState.kills, String(biome.get("id", "?")),
 		])
 
-	# Eventos ring relativos al bioma activo
+	# Eventos ring relativos al bioma activo (claves precalculadas por bioma).
 	var events: Array = biome.get("events", [])
-	for ev in events:
-		var key := str(ev.get("t", 0.0)) + "ring" + str(ev.get("count", 0)) + str(ev.get("radius", 0.0))
-		if t_local_min >= float(ev.get("t", -1.0)) and not _events_done.has(key):
-			_events_done[key] = true
-			var hp_mult := float(tier.get("hp_mult", 1.0))
-			EnemyManager.spawn_ring(
-				String(ev.get("enemy", "goblin")),
-				EnemyManager.player.position if EnemyManager.player != null else Vector3.ZERO,
-				int(ev.get("count", 20)),
-				float(ev.get("radius", 20.0)),
-				hp_mult
-			)
+	if not events.is_empty():
+		for entry in _event_entries(biome):
+			var ev: Dictionary = entry["ev"]
+			var key: String = entry["key"]
+			if t_local_min >= float(ev.get("t", -1.0)) and not _events_done.has(key):
+				_events_done[key] = true
+				var hp_mult := float(tier.get("hp_mult", 1.0))
+				EnemyManager.spawn_ring(
+					String(ev.get("enemy", "goblin")),
+					EnemyManager.player.position if EnemyManager.player != null else Vector3.ZERO,
+					int(ev.get("count", 20)),
+					float(ev.get("radius", 20.0)),
+					hp_mult
+				)
 
 	# Jefe del bioma (roadmap 3.4): entra tras boss_t segundos locales
 	var boss_t := float(biome.get("boss_t", -1.0))
@@ -113,6 +116,23 @@ func _physics_process(dt: float) -> void:
 				float(tier.get("hp_mult", 1.0)),
 				false
 			)
+
+
+func _event_entries(biome: Dictionary) -> Array:
+	var id := String(biome.get("id", ""))
+	var cached = _event_cache.get(id)
+	if cached != null:
+		return cached
+	var out: Array = []
+	var events = biome.get("events", [])
+	if events is Array:
+		for ev in events:
+			out.append({
+				"ev": ev,
+				"key": str(ev.get("t", 0.0)) + "ring" + str(ev.get("count", 0)) + str(ev.get("radius", 0.0)),
+			})
+	_event_cache[id] = out
+	return out
 
 
 func _spawn_one(tier: Dictionary) -> void:

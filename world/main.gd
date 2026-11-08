@@ -1,10 +1,16 @@
 ## Main — construir mundo, cámara, luces y parar/partir la run (prototipo).
 extends Node3D
 
+const TerrainField = preload("res://world/terrain.gd")
+const WeatherSystem = preload("res://world/weather.gd")
+const Hazards = preload("res://world/hazards.gd")
+const Pickups = preload("res://world/pickups.gd")
+const PlayerCharacter = preload("res://player/player.gd")
+
 const CAM_OFFSET := Vector3(0.0, 19.5, 12.5)
 const MOUSE_SENS := 0.004
 
-var player: Node3D
+var player: PlayerCharacter
 var cam: Camera3D
 var cam_yaw := 0.0           # yaw de cámara: fijo en "fija", se rota con mouse en "mouse"
 
@@ -14,14 +20,16 @@ var _biome_id := ""
 var _biome_cur := {}
 var _env: Environment = null
 var _light: DirectionalLight3D = null
-var _terrain: Node3D = null
-var _weather: Node3D = null
-var _hazards: Node3D = null
-var _pickups: Node3D = null
+var _terrain: TerrainField = null
+var _weather: WeatherSystem = null
+var _hazards: Hazards = null
+var _pickups: Pickups = null
 var _fx_rings: Array = []   # {node, t} anillos de portal (roadmap 3.2)
 var _smoke_pickups_done := false
 var _props_holder: Node3D = null
 var _prop_mat: ShaderMaterial = null
+var _bark_mat: ShaderMaterial = null
+var _pale_mat: ShaderMaterial = null
 var _chests: Array = []      # [{node: MeshInstance3D, base_y: float, t: float}]
 var _light_base := 1.1
 var _flash_t := 0.0
@@ -31,12 +39,10 @@ func _ready() -> void:
 	add_to_group("main")
 	_build_environment()
 	_build_terrain()
-	_hazards = Node3D.new()
-	_hazards.set_script(load("res://world/hazards.gd"))
+	_hazards = Hazards.new()
 	add_child(_hazards)
-	_hazards.call("setup", _terrain)
-	_pickups = Node3D.new()
-	_pickups.set_script(load("res://world/pickups.gd"))
+	_hazards.setup(_terrain)
+	_pickups = Pickups.new()
 	add_child(_pickups)
 	_props_holder = Node3D.new()
 	add_child(_props_holder)
@@ -89,14 +95,14 @@ func _physics_process(_dt: float) -> void:
 	if (GameState.debug_auto_upgrade and GameState.run_active and not _smoke_pickups_done
 			and GameState.run_time > 20.0 and player != null and _pickups != null):
 		_smoke_pickups_done = true
-		_pickups.call("spawn", "heal", player.position)
-		_pickups.call("spawn", "magnet", player.position)
-		_pickups.call("spawn", "bomb", player.position)
+		_pickups.spawn("heal", player.position)
+		_pickups.spawn("magnet", player.position)
+		_pickups.spawn("bomb", player.position)
 
 
 func _on_run_reset() -> void:
-	if _pickups != null and _pickups.has_method("clear"):
-		_pickups.call("clear")
+	if _pickups != null:
+		_pickups.clear()
 	_spawn_chests(2 + randi() % 2)
 
 
@@ -106,21 +112,24 @@ func _on_kill_event(pos: Vector3, elite: bool) -> void:
 	if elite:
 		_spawn_chest_at(pos)
 	elif randf() < 0.02 and _pickups != null:
-		_pickups.call("spawn_random", pos)
+		_pickups.spawn_random(pos)
 
 
 func _update_rings(dt: float) -> void:
-	for r in _fx_rings.duplicate():
+	if _fx_rings.is_empty():
+		return
+	for i in range(_fx_rings.size() - 1, -1, -1):
+		var r: Dictionary = _fx_rings[i]
 		var node: MeshInstance3D = r["node"]
 		if not is_instance_valid(node):
-			_fx_rings.erase(r)
+			_fx_rings.remove_at(i)
 			continue
 		r["t"] = float(r["t"]) + dt
 		var k: float = clampf(float(r["t"]) / 1.1, 0.0, 1.0)
 		node.scale = Vector3.ONE * (0.4 + 4.0 * k)
 		((node.mesh as TorusMesh).material as StandardMaterial3D).albedo_color.a = 0.7 * (1.0 - k)
 		if k >= 1.0:
-			_fx_rings.erase(r)
+			_fx_rings.remove_at(i)
 			node.queue_free()
 
 
@@ -147,9 +156,12 @@ func _update_cam(dt: float) -> void:
 	cam.position = cam.position.lerp(player.position + off, 0.18)
 	if _shake > 0.0:
 		_shake = maxf(_shake - dt, 0.0)
-		cam.position += Vector3(
-			randf_range(-1.0, 1.0), randf_range(-1.0, 1.0) * 0.4, randf_range(-1.0, 1.0)
-		) * 0.35 * _shake
+		# Accesibilidad: la sacudida se escala o se desactiva desde Ajustes.
+		var amp := 0.35 * _shake * GameState.screen_shake
+		if amp > 0.0:
+			cam.position += Vector3(
+				randf_range(-1.0, 1.0), randf_range(-1.0, 1.0) * 0.4, randf_range(-1.0, 1.0)
+			) * amp
 	cam.look_at(player.position + Vector3(0.0, 0.5, 0.0))
 
 
@@ -162,7 +174,7 @@ func _apply_camera_mode() -> void:
 
 func _terrain_h(pos: Vector3) -> float:
 	if GameState.terrain != null:
-		return float(GameState.terrain.call("height_at", pos.x, pos.z))
+		return GameState.terrain.height_at(pos.x, pos.z)
 	return 0.0
 
 
@@ -226,7 +238,7 @@ func _col(a: Variant, fallback: Color) -> Color:
 
 func _apply_biome(b: Dictionary) -> void:
 	if _hazards != null:
-		_hazards.call("spawn_for_biome", b)
+		_hazards.spawn_for_biome(b)
 	var id := String(b.get("id", "bosque"))
 	var tag := "%s#%d" % [id, GameState.endless_loop]
 	if tag != _biome_id:
@@ -236,7 +248,7 @@ func _apply_biome(b: Dictionary) -> void:
 		GameState.biome_index = _biome_index(id)
 		var g := _col(b.get("ground"), Color(0.24, 0.33, 0.30))
 		if GameState.terrain != null:
-			GameState.terrain.call("set_palette", g)
+			GameState.terrain.set_palette(g)
 		if _env != null:
 			_env.background_color = _col(b.get("bg"), Color(0.09, 0.08, 0.14))
 			_env.ambient_light_color = _col(b.get("ambient"), Color(0.55, 0.55, 0.75))
@@ -265,9 +277,9 @@ func _biome_index(id: String) -> int:
 func _apply_weather(b: Dictionary) -> void:
 	var w: Dictionary = b.get("weather", {}) if b.get("weather", {}) is Dictionary else {}
 	if _weather != null:
-		_weather.call("set_weather", w)
-		GameState.weather_name = String(_weather.call("label"))
-		GameState.weather_speed_mult = float(_weather.call("speed_mult"))
+		_weather.set_weather(w)
+		GameState.weather_name = _weather.label()
+		GameState.weather_speed_mult = _weather.speed_mult()
 	else:
 		GameState.weather_name = "Despejado"
 		GameState.weather_speed_mult = 1.0
@@ -344,8 +356,9 @@ func _make_prop(kind: String, mat: ShaderMaterial) -> Node3D:
 			trunk.bottom_radius = 0.28
 			trunk.height = 1.8
 			trunk.radial_segments = 5
-			var bark := _toon_mat(Color(0.28, 0.22, 0.18))
-			trunk.material = bark
+			if _bark_mat == null:
+				_bark_mat = _toon_mat(Color(0.28, 0.22, 0.18))
+			trunk.material = _bark_mat
 			_add_mesh(root, trunk, Vector3(0.0, 0.9, 0.0))
 			var crown := CylinderMesh.new()
 			crown.top_radius = 0.02
@@ -360,8 +373,9 @@ func _make_prop(kind: String, mat: ShaderMaterial) -> Node3D:
 			stem.bottom_radius = 0.24
 			stem.height = randf_range(0.7, 1.3)
 			stem.radial_segments = 5
-			var pale := _toon_mat(Color(0.78, 0.76, 0.62))
-			stem.material = pale
+			if _pale_mat == null:
+				_pale_mat = _toon_mat(Color(0.78, 0.76, 0.62))
+			stem.material = _pale_mat
 			_add_mesh(root, stem, Vector3(0.0, stem.height * 0.5, 0.0))
 			var cap := SphereMesh.new()
 			cap.radius = randf_range(0.55, 0.95)
@@ -448,19 +462,17 @@ func _build_environment() -> void:
 
 
 func _build_terrain() -> void:
-	_terrain = Node3D.new()
-	_terrain.set_script(load("res://world/terrain.gd"))
+	_terrain = TerrainField.new()
 	add_child(_terrain)
-	_terrain.call("build")
+	_terrain.build()
 	GameState.terrain = _terrain
 
 
 func _build_weather() -> void:
-	_weather = Node3D.new()
-	_weather.set_script(load("res://world/weather.gd"))
+	_weather = WeatherSystem.new()
 	add_child(_weather)
-	_weather.call("setup", _terrain)
-	_weather.connect("flash", _on_weather_flash)
+	_weather.setup(_terrain)
+	_weather.flash.connect(_on_weather_flash)
 
 
 func _apply_quality() -> void:
@@ -472,7 +484,7 @@ func _apply_quality() -> void:
 	if cam != null:
 		cam.far = GameState.camera_far
 	if _weather != null:
-		_weather.call("apply_quality")
+		_weather.apply_quality()
 	if _env != null:
 		_env.glow_enabled = GameState.device_tier == "alto"
 		if _env.glow_enabled:
@@ -486,15 +498,14 @@ func apply_quality_live() -> void:
 	if _light != null:
 		_light.shadow_enabled = GameState.shadows
 	if _weather != null:
-		_weather.call("apply_quality")
+		_weather.apply_quality()
 	if not _biome_cur.is_empty() and _props_holder != null:
 		_prop_rebuild(_biome_cur)
 		_apply_weather(_biome_cur)
 
 
-func _build_player() -> Node3D:
-	var p := Node3D.new()
-	p.set_script(load("res://player/player.gd"))
+func _build_player() -> PlayerCharacter:
+	var p := PlayerCharacter.new()
 
 	var holder := Node3D.new()
 	holder.name = "Model"
