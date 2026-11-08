@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7-stable
+  GODOT_BIN: Godot_v4.7-stable_linux.x86_64
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descargar Godot
+        run: |
+          curl -fL --retry 3 -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_BIN}.zip"
+          unzip -q godot.zip
+          chmod +x "${GODOT_BIN}"
+          "./${GODOT_BIN}" --version
+
+      - name: Importar proyecto
+        run: "./${GODOT_BIN}" --headless --path . --import
+
+      - name: Validar contenido JSON
+        run: "./${GODOT_BIN}" --headless --path . --script res://tools/validate_content.gd
+
+      - name: Layout táctil (5", 6.5", tablet)
+        run: bash tools/check_layouts.sh
+
+      - name: Smoke test (75 s)
+        run: |
+          HORDAVIA_SMOKE=1 "./${GODOT_BIN}" --headless --path . > smoke.log 2>&1
+          tail -60 smoke.log
+          grep -q "SMOKE_RESULT" smoke.log
+
+      - name: Subir log si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-log
+          path: smoke.log
+          if-no-files-found: ignore

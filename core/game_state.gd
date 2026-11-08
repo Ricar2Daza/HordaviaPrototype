@@ -22,13 +22,14 @@ signal contract_completed(definition: Dictionary)
 # --- Referencias globales de escena (registradas por world/Main) ---
 var terrain: TerrainField = null  # mundo procedural con height_at(x, z) (world/terrain.gd)
 var cam_ref: Camera3D = null
-var arena_radius := 35.5          # radio jugable del mapa ampliado
+var arena_radius := 30.0          # radio jugable (dentro de la cordillera)
 var biome_name := ""              # bioma activo para HUD/hub
 var biome_index := 0
 var weather_name := "Despejado"   # clima activo para HUD
 var weather_type := "clear"
 var weather_speed_mult := 1.0     # penalización suave de movimiento por clima
 var camera_mode := "fija"         # "fija" | "mouse" (WASD y joystick son cámara-relativos)
+var haptics_enabled := true       # vibración móvil/mando (roadmap 5.5)
 var card_source := "nivel"        # origen de las cartas: "nivel" | "cofre"
 var overlay_open := false         # true si HUD tiene la pausa de cartas abierta
 var contract_id := ""
@@ -105,6 +106,7 @@ var shadows := false              # sombras direccionales (tier alto)
 var render_scale := 1.0           # resolución 3D interna
 var prop_mult := 1.0              # densidad de props del bioma
 var camera_far := 100.0           # distancia de dibujado
+var _last_haptic_ms := 0          # cooldown interno de vibración
 
 func set_camera_mode(m: String) -> void:
 	camera_mode = m
@@ -140,6 +142,29 @@ func set_touch_scale(v: float) -> void:
 	if JoystickLayer != null:
 		JoystickLayer.refresh_layout()
 	setting_changed.emit()
+
+
+func set_haptics(enabled: bool) -> void:
+	haptics_enabled = enabled
+	SaveManager.save_settings({"haptics": enabled})
+
+
+## Vibración corta en móvil o en el primer mando conectado.
+## El cooldown evita ráfagas cuando varios sistemas reaccionan al mismo golpe.
+func haptic(strength := 0.5, duration_ms := 35, force := false) -> void:
+	if not haptics_enabled:
+		return
+	var now := Time.get_ticks_msec()
+	if not force and now - _last_haptic_ms < 30:
+		return
+	_last_haptic_ms = now
+	var s := clampf(strength, 0.0, 1.0)
+	if OS.has_feature("mobile"):
+		Input.vibrate_handheld(duration_ms, s)
+		return
+	var pads := Input.get_connected_joypads()
+	if not pads.is_empty():
+		Input.start_joy_vibration(int(pads[0]), s * 0.6, s, float(duration_ms) / 1000.0)
 
 
 # --- Tienda meta y personajes (roadmap 4.1/4.2) ---
@@ -255,6 +280,7 @@ var _smoke_evo_done := false     # smoke: prueba única de evolución (2.2)
 var _smoke_banish_done := false  # smoke: prueba única de destierro (2.3)
 var _smoke_passive_done := false # smoke: prueba única de pasivas nuevas (2.5)
 var _smoke_powers_done := false  # smoke: armas spiral/frost + crítico/lifesteal
+var _smoke_ranged_done := false  # smoke: enemigos a distancia y proyectiles hostiles
 var _smoke_definitive_done := false # smoke: armas mazo/meteoro/dron/vacío y clima
 var _smoke_display_done := false # smoke: opciones FPS/calidad (5.4)
 
@@ -349,8 +375,17 @@ func _process(delta: float) -> void:
 			EnemyManager.spawn("bomber", pp + Vector3(2.0, 0.0, 0.0), 1.0)
 			EnemyManager.spawn("shaman", pp + Vector3(-2.0, 0.0, 0.0), 1.0)
 			EnemyManager.spawn("wisp", pp + Vector3(0.0, 0.0, 2.0), 1.0)
+			EnemyManager.spawn("archer", pp + Vector3(8.0, 0.0, 0.0), 1.0)
+			EnemyManager.spawn("spitter", pp + Vector3(-8.0, 0.0, 0.0), 1.0)
+			EnemyManager.spawn("sandcaster", pp + Vector3(0.0, 0.0, 8.0), 1.0)
 		print("SMOKE_POWERS spiral=%s frost=%s crit=%.2f leech=%.2f" % [
 			str(weapons.has("spiral")), str(weapons.has("frost")), crit_chance, lifesteal,
+		])
+	# Smoke: comprueba que los enemigos a distancia han disparado proyectiles.
+	if debug_auto_upgrade and run_active and not get_tree().paused and not _smoke_ranged_done and run_time > 45.0:
+		_smoke_ranged_done = true
+		print("SMOKE_RANGED fired=%d active=%d" % [
+			HostileProjectiles.total_fired, HostileProjectiles.active_count(),
 		])
 	# Smoke: a los 55 s prueba el arsenal definitivo, el clima y el mapa ampliado.
 	if debug_auto_upgrade and run_active and not get_tree().paused and not _smoke_definitive_done and run_time > 55.0:
@@ -423,6 +458,7 @@ func apply_saved_display() -> void:
 	camera_mode = String(SaveManager.settings.get("camera_mode", "fija"))
 	if camera_mode != "mouse":
 		camera_mode = "fija"
+	haptics_enabled = bool(SaveManager.settings.get("haptics", true))
 	fps_limit = int(SaveManager.settings.get("fps_limit", 60))
 	if not [0, 30, 60, 120].has(fps_limit):
 		fps_limit = 60
@@ -711,6 +747,7 @@ func start_run() -> void:
 	_smoke_banish_done = false
 	_smoke_passive_done = false
 	_smoke_powers_done = false
+	_smoke_ranged_done = false
 	_smoke_definitive_done = false
 	_smoke_display_done = false
 	_smoke_features_done = false
@@ -757,6 +794,7 @@ func add_xp(v: int) -> void:
 	while xp >= xp_to_next(level):
 		xp -= xp_to_next(level)
 		level += 1
+		haptic(0.55, 40)
 		var choices := ContentDB.roll_upgrades(upgrade_counts)
 		if choices.is_empty():
 			continue
@@ -910,12 +948,13 @@ func magnet_boost(v: float, seconds: float) -> void:
 
 
 func take_damage(d: float) -> void:
-	if not run_active:
+	if not run_active or d <= 0.0:
 		return
 	if damage_grace > 0.0:
 		return
 	damage_grace = 0.5
 	hp = maxf(hp - d * (1.0 - armor), 0.0)
+	haptic(0.85, 50)
 	hp_changed.emit(hp, max_hp)
 	if hp <= 0.0:
 		end_run(false)
@@ -980,6 +1019,7 @@ func offer_chest_cards() -> void:
 		apply_upgrade(choices[0])
 		return
 	AudioManager.play_sfx("levelup")
+	haptic(0.5, 40)
 	leveled.emit(choices)
 
 
@@ -1042,5 +1082,6 @@ func end_run(victory: bool) -> void:
 	)
 	last_result["achievements"] = new_ones
 	AudioManager.play_sfx("gameover" if not victory else "levelup")
+	haptic(1.0, 140, true)
 	get_tree().paused = true
 	run_ended.emit(last_result)

@@ -190,6 +190,53 @@ Para publicar en Play falta generar el **AAB** (mismo keystore):
 2. Cambiar `gradle_build/export_format=1` (AAB) o marcar “Exportar AAB” en el editor.
 3. Exportar y probar en un teléfono real de cada tier (ver `03_DISPOSITIVOS_OBJETIVO.md`).
 
+## Build local en Linux con el código actual
+
+Requisitos:
+
+- Godot 4.7 + **export templates** en la carpeta de tu versión, por ejemplo
+  `~/.local/share/godot/export_templates/4.7.stable/` o `4.7.2.stable/`.
+- Android SDK 36 y JDK 17/21 configurados en Godot.
+- `adb` para instalar en el teléfono.
+
+```bash
+bash tools/build_android.sh              # debug
+bash tools/build_android.sh --release    # release (keystore configurado)
+adb install -r build/Hordavia-debug.apk
+adb logcat -s godot:V
+```
+
+El script comprueba que existan las templates y falla con un mensaje claro si faltan.
+
+> En el entorno donde se añadieron el layout responsive y los hápticos no había
+> export templates, SDK Android ni dispositivo conectado. Por eso **no se pudo
+> regenerar el APK ni hacer la prueba física**: los APK de `build/` siguen siendo
+> los del 26/10 y no incluyen estos cambios.
+
+## Checklist de prueba en dispositivo (roadmap 5.5/5.6)
+
+Probar en **5"**, **6.5"** y **tablet (~7")**, en landscape:
+
+- [ ] Joystick izquierdo + DASH/SALTO con dos pulgares; sin toques fantasma.
+- [ ] Botones dentro del safe area (notch/isla) y sin solaparse con el HUD.
+- [ ] Cámara **Fija** por defecto; C/Y alterna; en Mouse el stick derecho orbita.
+- [ ] Pausa con Start/☰; botón atrás de Android abre/cierra pausa (no cierra la app).
+- [ ] Al perder foco se guarda y pausa; al volver **no** reanuda sola.
+- [ ] Vibración ON/OFF en Ajustes → Móvil; persiste tras reiniciar.
+- [ ] Hápticos en daño, dash, salto, jefe, level-up y game over (sin ráfagas).
+- [ ] 30/60 FPS estables; calidad Auto/Baja/Media/Alta sin sobrecalentamiento.
+- [ ] Guardado persiste (monedas, settings, personaje, maldición y logros).
+- [ ] Cartas de level-up legibles y sin desbordar en pantalla pequeña.
+- [ ] Audio música/SFX y mute al perder foco.
+
+Verificación automática del layout táctil (sin display):
+
+```bash
+bash tools/check_layouts.sh
+```
+
+Salida esperada: `LAYOUT_OK` para `960x540`, `1280x720` y `1920x1080`.
+
 ## Errores que ya no deben aparecer
 
 - “Se requiere una ruta válida para el SDK de Java” → `java_sdk_path` vacío.

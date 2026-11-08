@@ -15,12 +15,13 @@
 			"boss_t": 150.0, "boss_key": "boss_forest",
 			"tiers": [
 				{ "t": 0, "budget": 2.0, "pools": { "goblin": 70, "bat": 30 }, "hp_mult": 1.0 },
-				{ "t": 2, "budget": 6, "pools": { "goblin": 45, "bat": 40, "wisp": 15 }, "hp_mult": 1.5 },
-				{ "t": 4, "budget": 12, "pools": { "goblin": 40, "bat": 30, "brute": 15, "bomber": 10, "wisp": 5 }, "hp_mult": 2.2 },
-				{ "t": 6, "budget": 16, "pools": { "goblin": 20, "wisp": 25, "bomber": 25, "brute": 15, "shaman": 10, "bat": 5 }, "hp_mult": 3.0 }
+				{ "t": 2, "budget": 6, "pools": { "goblin": 40, "bat": 35, "wisp": 10, "archer": 15 }, "hp_mult": 1.5 },
+				{ "t": 4, "budget": 12, "pools": { "goblin": 35, "bat": 25, "brute": 15, "bomber": 10, "wisp": 5, "archer": 10 }, "hp_mult": 2.2 },
+				{ "t": 6, "budget": 16, "pools": { "goblin": 15, "wisp": 20, "bomber": 20, "brute": 15, "shaman": 10, "bat": 5, "archer": 15 }, "hp_mult": 3.0 }
 			],
 			"events": [
 				{ "t": 1.5, "enemy": "bat", "count": 22, "radius": 24.0 },
+				{ "t": 3.5, "enemy": "archer", "count": 12, "radius": 28.0 },
 				{ "t": 5.0, "enemy": "goblin", "count": 34, "radius": 28.0 }
 			]
 		},
@@ -28,23 +29,24 @@
 			"id": "cuevas",
 			"name": "Cuevas Profundas",
 			"t_start": 6,
-			"ground": [0.18, 0.16, 0.24],
-			"bg": [0.04, 0.03, 0.07],
-			"ambient": [0.35, 0.35, 0.55],
-			"light": [0.7, 0.75, 1.0],
-			"light_energy": 0.9,
-			"props": { "kind": "stalg", "count": 70, "color": [0.35, 0.28, 0.45] },
-			"hazard": "lava", "hazard_count": 7,
-			"weather": { "type": "embers", "label": "Brasas subterráneas", "intensity": 0.55, "fog": 0.018, "speed": 1.0, "color": [1.0, 0.42, 0.16] },
+			"ground": [0.12, 0.22, 0.30],
+			"bg": [0.02, 0.05, 0.10],
+			"ambient": [0.32, 0.52, 0.68],
+			"light": [0.58, 0.82, 1.0],
+			"light_energy": 1.0,
+			"props": { "kind": "stalg", "count": 70, "color": [0.28, 0.58, 0.68] },
+			"hazard": "lava", "hazard_count": 7, "hazard_color": [0.25, 0.85, 1.0, 0.48],
+			"weather": { "type": "fog", "label": "Bruma de cristal", "intensity": 0.65, "fog": 0.020, "speed": 0.98, "color": [0.45, 0.85, 0.98] },
 			"boss_t": 120.0, "boss_key": "boss_caves",
 			"tiers": [
-				{ "t": 0, "budget": 14, "pools": { "bat": 55, "goblin": 25, "brute": 20 }, "hp_mult": 1.4 },
-				{ "t": 2, "budget": 20, "pools": { "bat": 45, "brute": 25, "goblin": 15, "wisp": 15 }, "hp_mult": 2.1 },
-				{ "t": 4, "budget": 28, "pools": { "bat": 35, "brute": 35, "bomber": 15, "wisp": 15 }, "hp_mult": 3.0 },
-				{ "t": 6, "budget": 34, "pools": { "bat": 25, "brute": 25, "wisp": 20, "bomber": 20, "shaman": 10 }, "hp_mult": 4.2 }
+				{ "t": 0, "budget": 14, "pools": { "bat": 50, "goblin": 20, "brute": 20, "spitter": 10 }, "hp_mult": 1.4 },
+				{ "t": 2, "budget": 20, "pools": { "bat": 40, "brute": 20, "goblin": 10, "wisp": 15, "spitter": 15 }, "hp_mult": 2.1 },
+				{ "t": 4, "budget": 28, "pools": { "bat": 30, "brute": 30, "bomber": 15, "wisp": 10, "spitter": 15 }, "hp_mult": 3.0 },
+				{ "t": 6, "budget": 34, "pools": { "bat": 20, "brute": 20, "wisp": 15, "bomber": 15, "shaman": 10, "spitter": 20 }, "hp_mult": 4.2 }
 			],
 			"events": [
 				{ "t": 1.0, "enemy": "bat", "count": 40, "radius": 26.0 },
+				{ "t": 3.0, "enemy": "spitter", "count": 14, "radius": 28.0 },
 				{ "t": 4.0, "enemy": "brute", "count": 14, "radius": 30.0 }
 			]
 		},
@@ -63,13 +65,14 @@
 			"hazard": "lava", "hazard_count": 6,
 			"weather": { "type": "sand", "label": "Tormenta de arena", "intensity": 0.85, "fog": 0.030, "speed": 0.94, "color": [0.86, 0.66, 0.38] },
 			"tiers": [
-				{ "t": 0, "budget": 22, "pools": { "brute": 55, "goblin": 30, "stalker": 15 }, "hp_mult": 1.8 },
-				{ "t": 2, "budget": 30, "pools": { "brute": 50, "boss_swarm": 20, "wisp": 15, "stalker": 15 }, "hp_mult": 2.7 },
-				{ "t": 4, "budget": 40, "pools": { "brute": 40, "boss_swarm": 25, "bomber": 15, "wisp": 10, "stalker": 10 }, "hp_mult": 3.8 },
-				{ "t": 6, "budget": 48, "pools": { "brute": 30, "wisp": 20, "bomber": 25, "shaman": 10, "boss_swarm": 10, "stalker": 5 }, "hp_mult": 5.2 }
+				{ "t": 0, "budget": 22, "pools": { "brute": 50, "goblin": 25, "stalker": 15, "sandcaster": 10 }, "hp_mult": 1.8 },
+				{ "t": 2, "budget": 30, "pools": { "brute": 45, "boss_swarm": 15, "wisp": 10, "stalker": 15, "sandcaster": 15 }, "hp_mult": 2.7 },
+				{ "t": 4, "budget": 40, "pools": { "brute": 35, "boss_swarm": 20, "bomber": 15, "wisp": 10, "stalker": 10, "sandcaster": 10 }, "hp_mult": 3.8 },
+				{ "t": 6, "budget": 48, "pools": { "brute": 25, "wisp": 15, "bomber": 20, "shaman": 10, "boss_swarm": 10, "stalker": 5, "sandcaster": 15 }, "hp_mult": 5.2 }
 			],
 			"events": [
 				{ "t": 0.5, "enemy": "boss_swarm", "count": 2, "radius": 28.0 },
+				{ "t": 2.5, "enemy": "sandcaster", "count": 12, "radius": 28.0 },
 				{ "t": 3.5, "enemy": "goblin", "count": 44, "radius": 28.0 }
 			]
 		},
@@ -159,13 +162,14 @@
 			"weather": { "type": "storm", "label": "Tormenta del eclipse", "intensity": 1.0, "fog": 0.030, "speed": 0.90, "color": [0.58, 0.64, 0.92] },
 			"boss_t": 150.0, "boss_key": "boss_ruins",
 			"tiers": [
-				{ "t": 0, "budget": 34, "pools": { "stalker": 30, "wisp": 25, "brute": 25, "shaman": 20 }, "hp_mult": 3.4 },
-				{ "t": 2, "budget": 44, "pools": { "stalker": 25, "wisp": 20, "brute": 25, "golem": 15, "shaman": 15 }, "hp_mult": 5.0 },
-				{ "t": 4, "budget": 56, "pools": { "brute": 25, "golem": 25, "stalker": 20, "wisp": 15, "shaman": 15 }, "hp_mult": 6.8 },
-				{ "t": 6, "budget": 68, "pools": { "golem": 30, "brute": 25, "stalker": 20, "shaman": 15, "bomber": 10 }, "hp_mult": 9.0 }
+				{ "t": 0, "budget": 34, "pools": { "stalker": 25, "wisp": 20, "brute": 25, "shaman": 20, "archer": 10 }, "hp_mult": 3.4 },
+				{ "t": 2, "budget": 44, "pools": { "stalker": 20, "wisp": 15, "brute": 25, "golem": 15, "shaman": 15, "archer": 10 }, "hp_mult": 5.0 },
+				{ "t": 4, "budget": 56, "pools": { "brute": 25, "golem": 25, "stalker": 15, "wisp": 10, "shaman": 15, "archer": 10 }, "hp_mult": 6.8 },
+				{ "t": 6, "budget": 68, "pools": { "golem": 30, "brute": 20, "stalker": 15, "shaman": 15, "bomber": 10, "archer": 10 }, "hp_mult": 9.0 }
 			],
 			"events": [
 				{ "t": 1.0, "enemy": "stalker", "count": 34, "radius": 30.0 },
+				{ "t": 2.5, "enemy": "archer", "count": 14, "radius": 28.0 },
 				{ "t": 4.5, "enemy": "golem", "count": 16, "radius": 30.0 }
 			]
 		}

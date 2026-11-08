@@ -77,11 +77,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventMouseMotion and GameState.camera_mode == "mouse":
 		cam_yaw -= event.relative.x * MOUSE_SENS
-	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+	elif event.is_action_pressed("toggle_camera"):
 		GameState.set_camera_mode("mouse" if GameState.camera_mode == "fija" else "fija")
 
 
 func _physics_process(_dt: float) -> void:
+	# Stick derecho / Q-E: orbitar solo en modo Mouse (en Fija la cámara no gira).
+	if GameState.camera_mode == "mouse":
+		var cam_x := Input.get_axis("cam_left", "cam_right")
+		if absf(cam_x) > 0.05:
+			cam_yaw -= cam_x * 2.4 * _dt
 	_update_cam(_dt)
 	_update_chests(_dt)
 	_update_rings(_dt)
@@ -153,7 +158,15 @@ func _update_cam(dt: float) -> void:
 	if player == null or cam == null:
 		return
 	var off: Vector3 = Basis(Vector3.UP, cam_yaw) * CAM_OFFSET
-	cam.position = cam.position.lerp(player.position + off, 0.18)
+	var desired := player.position + off
+	# La cámara nunca entra en la cordillera: si el jugador está cerca del
+	# borde, se eleva por encima del terreno que hay detrás de él.
+	var clearance := _terrain_h(desired) + 2.5
+	desired.y = maxf(desired.y, clearance)
+	cam.position = cam.position.lerp(desired, 0.18)
+	# Segundo seguro tras el lerp: si la cámara venía retrasada, no se queda
+	# dentro de una columna de montaña mientras alcanza la altura objetivo.
+	cam.position.y = maxf(cam.position.y, _terrain_h(cam.position) + 2.0)
 	if _shake > 0.0:
 		_shake = maxf(_shake - dt, 0.0)
 		# Accesibilidad: la sacudida se escala o se desactiva desde Ajustes.
@@ -206,7 +219,7 @@ func _spawn_chests(count: int) -> void:
 	_chests.clear()
 	for i in count:
 		var ang := randf() * TAU
-		var r := randf_range(9.0, 32.0)
+		var r := randf_range(9.0, 27.0)
 		_spawn_chest_at(Vector3(cos(ang) * r, 0.0, sin(ang) * r))
 
 
@@ -317,10 +330,10 @@ func _prop_rebuild(b: Dictionary) -> void:
 	while placed < count and attempts < count * 5:
 		attempts += 1
 		var ang := randf() * TAU
-		var r := randf_range(7.0, 40.0)
+		var r := randf_range(7.0, 29.0)
 		var pos := Vector3(cos(ang) * r, 0.0, sin(ang) * r)
 		var gy := _terrain_h(pos)
-		if gy > 8.0:
+		if gy > 4.0:
 			continue
 		pos.y = gy
 		var node := _make_prop(kind, _prop_mat)

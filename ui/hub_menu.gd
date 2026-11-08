@@ -30,6 +30,7 @@ const CAMERA_OPTIONS := [["fija", "Fija"], ["mouse", "Mouse"]]
 const SHAKE_OPTIONS := [[0.0, "Off"], [0.5, "Suave"], [1.0, "Normal"]]
 const TOGGLE_OPTIONS := [[false, "Off"], [true, "On"]]
 const TOUCH_OPTIONS := [[0.0, "Auto"], [0.9, "S"], [1.0, "M"], [1.15, "L"]]
+const HAPTIC_OPTIONS := [[true, "Sí"], [false, "No"]]
 
 # Paleta "fuego sobre negro": el menú inicial es negro con llamas procedurales.
 const FIRE_SHADER := """
@@ -333,7 +334,7 @@ func _build_shell() -> void:
 	_scroll.add_child(_content)
 
 	var footer := Label.new()
-	footer.text = "WASD / joystick  ·  C cámara  ·  ESC o ☰ pausa  ·  guardado automático"
+	footer.text = "WASD / joystick / mando · C cambia cámara · ESC o ☰ pausa · Todo el progreso se guarda solo"
 	footer.add_theme_font_size_override("font_size", 10)
 	footer.add_theme_color_override("font_color", Color(1, 1, 1, 0.34))
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -826,9 +827,15 @@ func _render_settings() -> void:
 	_segmented(acc, TOUCH_OPTIONS, GameState.touch_scale, _set_touch_scale)
 	_label(acc, "Layout actual: %s" % JoystickLayer.layout_label(), 10, Color(0.70, 0.86, 1.0, 0.62))
 
+	var mobile := _card(_content, 0.0, Color(0.20, 0.28, 0.24))
+	_label(mobile, "MÓVIL", 17, Color(0.74, 1.0, 0.82))
+	_label(mobile, "Vibración", 12, Color(1, 1, 1, 0.66))
+	_segmented(mobile, HAPTIC_OPTIONS, GameState.haptics_enabled, _set_haptics)
+	_label(mobile, "El joystick y los botones escalan con la pantalla y respetan el notch.", 10, Color(0.70, 1.0, 0.80, 0.62))
+
 	var info := _card(_content, 0.0, Color(0.16, 0.22, 0.27))
 	_label(info, "CONTROLES", 15, Color(0.82, 1.0, 0.90))
-	_label(info, "Joystick virtual: mitad izquierda. Saltar/dash: botones táctiles. Teclado: WASD/flechas, Espacio salta, Shift dash, C cámara, ESC pausa.", 11, Color(1, 1, 1, 0.62))
+	_label(info, "Teclado: WASD/flechas, Espacio salta, Shift dash, C cámara, ESC pausa. Mando: stick izq. mover, A saltar, B dash, Y cámara, Start pausa, stick der. orbita (modo Mouse). Táctil: joystick + botones.", 11, Color(1, 1, 1, 0.62))
 	if GameState.run_active:
 		_primary(info, "▶  VOLVER AL JUEGO", func() -> void: resume_requested.emit(), 0.0, 44)
 
@@ -935,6 +942,14 @@ func _set_damage_numbers(v: bool) -> void:
 
 func _set_touch_scale(v: float) -> void:
 	GameState.set_touch_scale(v)
+	AudioManager.play_sfx("pickup", 1.15)
+	refresh()
+
+
+func _set_haptics(enabled: bool) -> void:
+	GameState.set_haptics(enabled)
+	if enabled:
+		GameState.haptic(0.4, 30)
 	AudioManager.play_sfx("pickup", 1.15)
 	refresh()
 

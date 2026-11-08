@@ -1,17 +1,17 @@
 ## Terrain — mapa procedural ampliado (arena + cordillera) por run.
-## Heightfield cuantizado en escalones de 0.5 m, terreno caminable en el centro y
+## Heightfield cuantizado en escalones de 0.25 m, terreno caminable en el centro y
 ## montañas altas en el perímetro. Render: MultiMesh de columnas + picos low-poly.
 ## API usada por player/enemigos/orbes: height_at(x, z) -> float.
 extends Node3D
 
 const HALF := 54.0         # mitad del mapa visual (108 x 108 m)
-const CELL := 3.0          # ancho de columna
-const STEP := 0.5          # altura por escalón
-const MAX_H := 4.2         # relieve interior caminable
-const CLIFF_FROM := 33.0   # inicio de la cordillera
-const CLIFF_H := 26.0      # altura máxima de la cordillera
+const CELL := 2.0          # ancho de columna (más fino = menos paredes falsas)
+const STEP := 0.25         # altura por escalón
+const MAX_H := 1.6         # relieve interior caminable (bajo, no tapa al jugador)
+const CLIFF_FROM := 31.0   # inicio de la cordillera (fuera del área jugable)
+const CLIFF_H := 24.0      # altura máxima de la cordillera
 const DEPTH := 4.0         # profundidad visual bajo la cota
-const PEAKS := 52
+const PEAKS := 64
 
 var _n := 0                          # columnas por lado
 var _h: PackedFloat32Array = PackedFloat32Array()
@@ -56,10 +56,10 @@ func build() -> void:
 	_mat = ShaderMaterial.new()
 	_mat.shader = load("res://fx/toon.gdshader")
 	_mat.set_shader_parameter("base_color", Color(0.24, 0.33, 0.30))
-	_mat.set_shader_parameter("height_color", Color(0.76, 0.82, 0.88))
-	_mat.set_shader_parameter("height_start", 8.0)
-	_mat.set_shader_parameter("height_end", 24.0)
-	_mat.set_shader_parameter("height_amount", 0.82)
+	_mat.set_shader_parameter("height_color", Color(0.46, 0.56, 0.51))
+	_mat.set_shader_parameter("height_start", 0.25)
+	_mat.set_shader_parameter("height_end", 2.4)
+	_mat.set_shader_parameter("height_amount", 0.30)
 	_mat.set_shader_parameter("rim_strength", 0.42)
 	box.material = _mat
 	mm.mesh = box
@@ -120,11 +120,13 @@ func _build_peaks(rng: RandomNumberGenerator) -> void:
 
 	for i in PEAKS:
 		var a := TAU * float(i) / float(PEAKS) + rng.randf_range(-0.05, 0.05)
-		var r := rng.randf_range(35.0, 49.0)
+		# Los picos quedan detrás de la cámara (radio > 47 m) para que nunca
+		# se interpongan entre la vista y el jugador cerca del borde.
+		var r := rng.randf_range(47.0, 52.5)
 		var pos := Vector3(cos(a) * r, 0.0, sin(a) * r)
 		var base_y := height_at(pos.x, pos.z) - 1.0
-		var h := rng.randf_range(7.0, 20.0)
-		var width := rng.randf_range(3.5, 7.5)
+		var h := rng.randf_range(6.0, 16.0)
+		var width := rng.randf_range(3.0, 6.0)
 		var t := Transform3D(
 			Basis.IDENTITY.scaled(Vector3(width, h, width)),
 			Vector3(pos.x, base_y + h * 0.5, pos.z)
@@ -153,12 +155,13 @@ func _compute_h(broad: FastNoiseLite, detail: FastNoiseLite, ridge: FastNoiseLit
 	var n := broad.get_noise_2d(x, z) * 0.5 + 0.5
 	var d := detail.get_noise_2d(x, z) * 0.5 + 0.5
 	var base := clampf(n * 0.72 + d * 0.28, 0.0, 1.0)
-	var center_flat := 0.42 + 0.58 * clampf(r / 24.0, 0.0, 1.0)
-	var relief := pow(base, 1.35) * MAX_H * center_flat
-	# Crestas suaves dentro del área jugable (colinas, no paredes).
-	if r > 19.0 and r < CLIFF_FROM:
-		var k := sin((r - 19.0) / maxf(CLIFF_FROM - 19.0, 0.01) * PI)
-		relief += k * 1.7 * (0.4 + 0.6 * d)
+	# Centro casi llano: el relieve solo aparece en el anillo exterior, con
+	# pendientes suaves. Así ninguna colina tapa al personaje ni finge altura.
+	var center_flat := 0.10 + 0.90 * clampf(r / 26.0, 0.0, 1.0)
+	var relief := pow(base, 1.55) * MAX_H * center_flat
+	if r > 18.0 and r < CLIFF_FROM:
+		var k := sin((r - 18.0) / maxf(CLIFF_FROM - 18.0, 0.01) * PI)
+		relief += k * 0.65 * (0.35 + 0.65 * d)
 	# Cordillera perimetral: ruido ridged + muro de fondo.
 	var mountain := 0.0
 	if r > CLIFF_FROM:
@@ -180,5 +183,11 @@ func height_at(x: float, z: float) -> float:
 func set_palette(c: Color) -> void:
 	if _mat != null:
 		_mat.set_shader_parameter("base_color", c)
+		# Tinte sutil por altura: hace legible el relieve real sin convertirlo
+		# en una pared visual que oculte al jugador.
+		_mat.set_shader_parameter("height_color", c.lightened(0.30).lerp(Color.WHITE, 0.08))
+		_mat.set_shader_parameter("height_start", 0.25)
+		_mat.set_shader_parameter("height_end", 2.4)
+		_mat.set_shader_parameter("height_amount", 0.30)
 	if _mountain_mat != null:
-		_mountain_mat.set_shader_parameter("base_color", c.darkened(0.28).lerp(Color(0.30, 0.31, 0.37), 0.55))
+		_mountain_mat.set_shader_parameter("base_color", c.darkened(0.42).lerp(Color(0.26, 0.28, 0.34), 0.60))

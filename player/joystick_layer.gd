@@ -1,6 +1,4 @@
-## JoystickLayer — joystick virtual flotante (guía §3.1).
-## Autoload CanvasLayer. Empieza donde tocas (mitad izquierda/o cualquier zona),
-## con fallback teclado WASD para probar en escritorio.
+## Joystick virtual flotante con teclado/gamepad, layout responsive y safe area.
 extends CanvasLayer
 
 signal moved(vec: Vector2)
@@ -9,17 +7,19 @@ signal dash_requested
 
 const RADIUS := 110.0
 const DEADZONE := 0.25
-const BTN_RADIUS := 62.0    # radio visual de los botones táctiles
-const BTN_HIT := 92.0       # radio de acierto de los botones táctiles
+const BTN_RADIUS := 62.0
+const BTN_HIT := 92.0
 const KNOB_RADIUS := 34.0
 const LABEL_SIZE := 22
 const BTN_MARGIN_X := 108.0
 const BTN_MARGIN_Y := 118.0
-const BTN_STACK := 140.0    # separación vertical DASH/SALTO
+const BTN_STACK := 140.0
 
 var move_vector := Vector2.ZERO
-var _ui_scale := 1.0        # layout táctil adaptable (roadmap 5.5)
-
+var _ui_scale := 1.0
+var _joy_radius := RADIUS
+var _btn_radius := BTN_RADIUS
+var _btn_hit := BTN_HIT
 var _touch_idx := -1
 var _btn_touch := -1
 var _origin := Vector2.ZERO
@@ -28,13 +28,10 @@ var _draw_root: Control
 var _dash_btn := Vector2.ZERO
 var _jump_btn := Vector2.ZERO
 var _btn_pos_valid := false
-var _kb_active := false
-var _kb_dir := Vector2.ZERO
 var _dirty := true
-var _last_size := Vector2.ZERO
+var _last_size := Vector2(-1.0, -1.0)
 var _last_win := Vector2i.ZERO
-var _insets_cache := Vector2.ZERO
-var _insets_size := Vector2(-1.0, -1.0)
+var _layout_reported := false
 
 
 func _ready() -> void:
@@ -42,40 +39,36 @@ func _ready() -> void:
 	_draw_root = Control.new()
 	_draw_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_draw_root.draw.connect(_on_draw)
-	add_child(_draw_root)
 	_draw_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_process(true)
+	add_child(_draw_root)
+	get_viewport().size_changed.connect(refresh_layout)
 	refresh_layout()
+	set_process(true)
 
 
-## Layout táctil adaptable (roadmap 5.5): auto por tamaño de pantalla o escala
-## manual persistida en Ajustes. Recalcula posiciones y radios de acierto.
+## Recalcula la escala de botones por pantalla o por override de Ajustes.
 func refresh_layout() -> void:
 	_ui_scale = _compute_ui_scale()
 	_btn_pos_valid = false
 	_dirty = true
+	if _draw_root != null:
+		_draw_root.queue_redraw()
 
 
 func _compute_ui_scale() -> float:
 	if GameState.touch_scale > 0.0:
 		return clampf(GameState.touch_scale, 0.8, 1.3)
-	# Tamaño físico de ventana/pantalla (los controles táctiles deben ser
-	# cómodos en móviles pequeños y no gigantes en pantallas grandes).
-	var win := DisplayServer.window_get_size()
-	var sz := Vector2(float(win.x), float(win.y)) if win.x > 0 and win.y > 0 else Vector2.ZERO
+	var sz := _layout_size()
 	if sz.x <= 0.0 or sz.y <= 0.0:
-		sz = _draw_root.size if _draw_root != null else Vector2.ZERO
-	if sz.x <= 0.0 or sz.y <= 0.0:
-		sz = get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1280.0, 720.0)
+		return 1.0
 	var short_side := minf(sz.x, sz.y)
 	if short_side < 620.0:
-		return 0.9      # compacto
+		return 0.9
 	if short_side < 860.0:
-		return 1.0      # medio
-	return 1.15         # grande
+		return 1.0
+	return 1.15
 
 
-## Texto para el smoke/diagnóstico: "auto:medio x1.00".
 func layout_label() -> String:
 	var mode := "auto" if GameState.touch_scale <= 0.0 else "manual"
 	var size_name := "compacto"
@@ -86,36 +79,55 @@ func layout_label() -> String:
 	return "%s:%s x%.2f" % [mode, size_name, _ui_scale]
 
 
-func _on_draw() -> void:
-	_update_button_positions()
-	var r := RADIUS * _ui_scale
-	if _touch_idx == -1 and _btn_touch == -1:
-		_draw_buttons(false)
-		return
-	_draw_root.draw_circle(_origin, r, Color(1, 1, 1, 0.08))
-	_draw_root.draw_circle(_origin, r * 0.92 + 2.0, Color(1, 1, 1, 0.12), false, 3.0 * _ui_scale)
-	_draw_root.draw_circle(_knob, KNOB_RADIUS * _ui_scale, Color(1, 1, 1, 0.35))
-	_draw_root.draw_circle(_knob, (KNOB_RADIUS - 4.0) * _ui_scale, Color(1, 1, 1, 0.6))
-	_draw_buttons(true)
+func _layout_size() -> Vector2:
+	var forced := OS.get_environment("HORDAVIA_LAYOUT_SIZE")
+	if not forced.is_empty():
+		var parts := forced.split("x")
+		if parts.size() == 2:
+			return Vector2(float(parts[0]), float(parts[1]))
+	if _draw_root != null and _draw_root.size.x > 0.0 and _draw_root.size.y > 0.0:
+		return _draw_root.size
+	return get_viewport().get_visible_rect().size if is_inside_tree() else Vector2.ZERO
 
 
-## Posiciones de los botones táctiles (compartidas por dibujo y acierto).
 func _update_button_positions() -> void:
-	var sz := _draw_root.size
-	if _btn_pos_valid and sz == _last_size:
+	var sz := _layout_size()
+	if sz.x <= 0.0 or sz.y <= 0.0:
 		return
-	_last_size = sz
-	_btn_pos_valid = true
-	_insets_cache = _compute_safe_insets(sz)
-	var mx := BTN_MARGIN_X * _ui_scale
-	var my := BTN_MARGIN_Y * _ui_scale
-	_dash_btn = Vector2(sz.x - mx - _insets_cache.x, sz.y - my - _insets_cache.y)
-	_jump_btn = Vector2(sz.x - mx - _insets_cache.x, sz.y - (my + BTN_STACK * _ui_scale) - _insets_cache.y)
-	_dirty = true
+	var win := DisplayServer.window_get_size()
+	if not _btn_pos_valid or sz != _last_size or win != _last_win:
+		_last_size = sz
+		_last_win = win
+		_ui_scale = _compute_ui_scale()
+		_joy_radius = RADIUS * _ui_scale
+		_btn_radius = BTN_RADIUS * _ui_scale
+		_btn_hit = BTN_HIT * _ui_scale
+		var insets := _compute_safe_insets(sz)
+		var right := BTN_MARGIN_X * _ui_scale + insets.x
+		_dash_btn = Vector2(sz.x - right, sz.y - BTN_MARGIN_Y * _ui_scale - insets.y)
+		_jump_btn = Vector2(
+			sz.x - right, sz.y - (BTN_MARGIN_Y + BTN_STACK) * _ui_scale - insets.y
+		)
+		_btn_pos_valid = true
+		_dirty = true
+		var inside := (
+			_dash_btn.x - _btn_radius >= 0.0 and _dash_btn.y - _btn_radius >= 0.0
+			and _dash_btn.x + _btn_radius <= sz.x and _dash_btn.y + _btn_radius <= sz.y
+			and _jump_btn.x - _btn_radius >= 0.0 and _jump_btn.y - _btn_radius >= 0.0
+			and _jump_btn.x + _btn_radius <= sz.x and _jump_btn.y + _btn_radius <= sz.y
+		)
+		if not inside:
+			push_error("LAYOUT fuera de pantalla: viewport=%s dash=%s jump=%s" % [
+				str(sz), str(_dash_btn), str(_jump_btn),
+			])
+		if OS.get_environment("HORDAVIA_LAYOUT_TEST") == "1" and not _layout_reported:
+			_layout_reported = true
+			print("LAYOUT viewport=%s scale=%.2f dash=%s jump=%s ok=%s" % [
+				str(sz), _ui_scale, str(_dash_btn), str(_jump_btn), str(inside),
+			])
 
 
 func _compute_safe_insets(sz: Vector2) -> Vector2:
-	## Insets derecho/inferior para no tapar botones con el notch.
 	var safe := DisplayServer.get_display_safe_area()
 	var win := DisplayServer.window_get_size()
 	if win.x <= 0 or win.y <= 0:
@@ -125,66 +137,77 @@ func _compute_safe_insets(sz: Vector2) -> Vector2:
 	return Vector2(right, bottom)
 
 
+func _on_draw() -> void:
+	_update_button_positions()
+	if _touch_idx == -1:
+		_draw_buttons(_btn_touch != -1)
+		return
+	_draw_root.draw_circle(_origin, _joy_radius, Color(1, 1, 1, 0.08))
+	_draw_root.draw_circle(
+		_origin, _joy_radius * 0.92 + 2.0, Color(1, 1, 1, 0.12), false, 3.0 * _ui_scale
+	)
+	_draw_root.draw_circle(_knob, KNOB_RADIUS * _ui_scale, Color(1, 1, 1, 0.35))
+	_draw_root.draw_circle(_knob, (KNOB_RADIUS - 4.0) * _ui_scale, Color(1, 1, 1, 0.6))
+	_draw_buttons(true)
+
+
 func _draw_buttons(active: bool) -> void:
 	var a := 0.55 if active else 0.3
-	var r := BTN_RADIUS * _ui_scale
-	_draw_root.draw_circle(_dash_btn, r, Color(0.4, 0.75, 1.0, a))
-	_draw_root.draw_circle(_dash_btn, r, Color(1, 1, 1, a + 0.1), false, 3.0 * _ui_scale)
-	_draw_root.draw_circle(_jump_btn, r, Color(0.45, 1.0, 0.6, a))
-	_draw_root.draw_circle(_jump_btn, r, Color(1, 1, 1, a + 0.1), false, 3.0 * _ui_scale)
+	_draw_root.draw_circle(_dash_btn, _btn_radius, Color(0.4, 0.75, 1.0, a))
+	_draw_root.draw_circle(
+		_dash_btn, _btn_radius, Color(1, 1, 1, a + 0.1), false, 3.0 * _ui_scale
+	)
+	_draw_root.draw_circle(_jump_btn, _btn_radius, Color(0.45, 1.0, 0.6, a))
+	_draw_root.draw_circle(
+		_jump_btn, _btn_radius, Color(1, 1, 1, a + 0.1), false, 3.0 * _ui_scale
+	)
 	var font := ThemeDB.fallback_font
 	var fs := int(round(LABEL_SIZE * _ui_scale))
-	var width := r * 2.0
-	var off := Vector2(-r, fs * 0.34)
-	_draw_root.draw_string(font, _dash_btn + off, "DASH", HORIZONTAL_ALIGNMENT_CENTER, width, fs, Color(0.05, 0.05, 0.1))
-	_draw_root.draw_string(font, _jump_btn + off, "SALTO", HORIZONTAL_ALIGNMENT_CENTER, width, fs, Color(0.05, 0.05, 0.1))
+	var width := _btn_radius * 2.0
+	var offset := Vector2(-_btn_radius, fs * 0.34)
+	_draw_root.draw_string(
+		font, _dash_btn + offset, "DASH", HORIZONTAL_ALIGNMENT_CENTER, width, fs, Color(0.05, 0.05, 0.1)
+	)
+	_draw_root.draw_string(
+		font, _jump_btn + offset, "SALTO", HORIZONTAL_ALIGNMENT_CENTER, width, fs, Color(0.05, 0.05, 0.1)
+	)
 
 
 func _process(_dt: float) -> void:
-	var kb := Vector2.ZERO
-	if Input.is_physical_key_pressed(KEY_A): kb.x -= 1
-	if Input.is_physical_key_pressed(KEY_D): kb.x += 1
-	if Input.is_physical_key_pressed(KEY_W): kb.y -= 1
-	if Input.is_physical_key_pressed(KEY_S): kb.y += 1
-	var kb_pressed := kb.length() > 0.05
-	if kb_pressed:
-		if not _kb_active or _kb_dir != kb:
-			_kb_active = true
-			_kb_dir = kb
-			move_vector = kb
-			_touch_idx = -1  # el teclado tiene prioridad en escritorio
-			_dirty = true
-	elif _kb_active:
-		# Al soltar el teclado se detiene el movimiento (antes quedaba "pegado").
-		_kb_active = false
-		_kb_dir = Vector2.ZERO
-		if _touch_idx == -1:
-			move_vector = Vector2.ZERO
-			_knob = _origin
-		_dirty = true
-	var win := DisplayServer.window_get_size()
-	if win != _last_win:
-		_last_win = win
-		_ui_scale = _compute_ui_scale()
-		_btn_pos_valid = false
-		_dirty = true
-	var sz := _draw_root.size
-	if sz != _last_size:
-		_ui_scale = _compute_ui_scale()
-		_btn_pos_valid = false
-		_dirty = true
-	# Redibuja solo cuando algo cambia (idle: ningún coste de dibujo).
+	_update_button_positions()
+	var next_move := Input.get_vector(
+		"move_left", "move_right", "move_up", "move_down", DEADZONE
+	)
+	if next_move.length() > 0.05:
+		_touch_idx = -1
+		_move(next_move)
+	elif _mouse_look():
+		_touch_idx = -1
+		_btn_touch = -1
+		_move(Vector2.ZERO)
+	elif _touch_idx == -1:
+		_move(Vector2.ZERO)
 	if _dirty:
 		_dirty = false
 		_draw_root.queue_redraw()
 
 
+func _mouse_look() -> bool:
+	return (
+		GameState.camera_mode == "mouse"
+		and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+		and not DisplayServer.is_touchscreen_available()
+	)
+
+
 func _unhandled_input(ev: InputEvent) -> void:
+	if _mouse_look():
+		return
+	_update_button_positions()
 	if ev is InputEventScreenTouch:
 		if ev.pressed:
 			if ev.index == _touch_idx:
 				return
-			# Prioridad: botones (dash/salto) antes que el joystick
 			if _check_button(ev.position, ev.index):
 				return
 			if _touch_idx == -1 and _btn_touch == -1:
@@ -199,27 +222,23 @@ func _unhandled_input(ev: InputEvent) -> void:
 			_btn_touch = -1
 			_dirty = true
 	elif ev is InputEventScreenDrag and ev.index == _touch_idx:
-		var radius := RADIUS * _ui_scale
 		var rel: Vector2 = ev.position - _origin
-		if rel.length() > DEADZONE * radius:
-			var v: Vector2 = rel / radius
-			_move(v.limit_length(1.0))
+		if rel.length() > DEADZONE * _joy_radius:
+			_move((rel / _joy_radius).limit_length(1.0))
 		else:
 			_move(Vector2.ZERO)
-		_knob = _origin + move_vector * radius
+		_knob = _origin + move_vector * _joy_radius
 		_dirty = true
 
 
 func _check_button(pos: Vector2, idx: int) -> bool:
-	if not _btn_pos_valid:
-		_update_button_positions()
-	var hit := BTN_HIT * _ui_scale
-	if pos.distance_to(_dash_btn) <= hit:
+	_update_button_positions()
+	if pos.distance_to(_dash_btn) <= _btn_hit:
 		_btn_touch = idx
 		_dirty = true
 		dash_requested.emit()
 		return true
-	if pos.distance_to(_jump_btn) <= hit:
+	if pos.distance_to(_jump_btn) <= _btn_hit:
 		_btn_touch = idx
 		_dirty = true
 		jump_requested.emit()
@@ -228,6 +247,8 @@ func _check_button(pos: Vector2, idx: int) -> bool:
 
 
 func _move(v: Vector2) -> void:
+	if move_vector == v:
+		return
 	move_vector = v
 	_dirty = true
 	moved.emit(v)

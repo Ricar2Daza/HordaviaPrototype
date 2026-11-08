@@ -11,11 +11,22 @@ func _run_checks() -> void:
 	await process_frame
 	var content: Node = root.get_node("ContentDB")
 	var game: Node = root.get_node("GameState")
+	var save: Node = root.get_node("SaveManager")
 	var contracts: Array = content.get("contracts")
 	var relics: Array = content.get("relics")
 	_check(contracts.size() == 4, "Se cargan los contratos")
 	_check(relics.size() == 5, "Se cargan las reliquias")
 	_check(content.call("validate").is_empty(), "El contenido pasa la validación")
+
+	save.call("configure_telemetry", {"enabled": true, "max_entries": 10})
+	for i in range(12):
+		save.call("log_event", "smoke", {"index": i})
+	var telemetry: Array = save.get("telemetry_events")
+	_check(telemetry.size() == 10, "La telemetría respeta su límite")
+	_check(int(telemetry[0]["payload"]["index"]) == 2, "La telemetría conserva los eventos recientes")
+	save.call("configure_telemetry", {"enabled": false, "max_entries": 10})
+	save.call("log_event", "disabled", {})
+	_check(telemetry.size() == 10, "La telemetría desactivada no registra eventos")
 
 	for contract in contracts:
 		game.set("run_active", true)

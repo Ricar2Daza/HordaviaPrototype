@@ -1,0 +1,20 @@
+# Godot 4: caché de importación/editor (se regenera solo)
+/.godot/
+
+# Binarios locales del engine (no versionar; CI los descarga)
+/Godot_v*
+
+# Builds locales. Los APK ya versionados se mantienen por compatibilidad
+# con el README; lo ideal es moverlos a GitHub Releases y dejar de trackearlos.
+/build/*.apk
+/build/*.aab
+/build/*.idsig
+/build/*.sha256
+/smoke.log
+
+# Credenciales de export
+export_credentials.cfg
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

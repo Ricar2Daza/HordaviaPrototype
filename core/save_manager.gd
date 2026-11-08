@@ -23,12 +23,34 @@ var settings := {}   # {"camera_mode": "fija"|"mouse"} — persistencia de opcio
 var meta := {}       # niveles de tienda meta (roadmap 4.1)
 var character := "vagabundo"  # personaje elegido (roadmap 4.2)
 var achievements := {}  # id → true (roadmap 4.4)
+var telemetry_enabled := false
+var telemetry_max_entries := 200
+var telemetry_events: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	load_all()
 	if OS.get_environment("HORDAVIA_SAVE_TEST") == "1":
 		_atomic_self_test.call_deferred()
+
+
+func configure_telemetry(config: Dictionary) -> void:
+	telemetry_enabled = bool(config.get("enabled", false))
+	telemetry_max_entries = maxi(int(config.get("max_entries", 200)), 10)
+	while telemetry_events.size() > telemetry_max_entries:
+		telemetry_events.pop_front()
+
+
+func log_event(event_name: String, payload: Dictionary) -> void:
+	if not telemetry_enabled:
+		return
+	telemetry_events.append({
+		"name": event_name,
+		"time": Time.get_unix_time_from_system(),
+		"payload": payload.duplicate(true),
+	})
+	while telemetry_events.size() > telemetry_max_entries:
+		telemetry_events.pop_front()
 
 
 func register_run(
